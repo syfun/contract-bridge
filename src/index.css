@@ -1,18 +1,65 @@
 :root {
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   line-height: 1.6;
   color: #203d31;
-  background: #eaf0eb;
+  background: #edf2e9;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  font-size: 16px;
 }
-
 * {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
   min-width: 320px;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #aa7737;
+  outline-offset: 4px;
+}
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+button,
+input {
+  min-height: 48px;
+  border: 1px solid #a6b6a2;
+  border-radius: 8px;
+}
+button {
+  color: #254b3a;
+  background: #f8faf4;
+  padding: 10px 18px;
+  font-weight: 600;
+}
+button:hover:not(:disabled) {
+  background: #e2ebda;
+}
+button:disabled {
+  opacity: 0.55;
+}
+input {
+  width: 100%;
+  background: #fffef8;
+  padding: 10px 14px;
+  color: #203d31;
+}
+small {
+  font-size: 14px;
 }

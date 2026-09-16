@@ -146,3 +146,6 @@ vite.config.ts.timestamp-*
 .DS_Store
 *.local
 dist-ssr/
+
+# Local room database
+data/
