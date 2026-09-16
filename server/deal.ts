@@ -1,4 +1,4 @@
-import { dummySeat, legalCards, playController } from './play.ts'
+import { dummySeat, legalCards, playController, seatController } from './play.ts'
 import { legalCalls } from './auction.ts'
 import { randomInt } from 'node:crypto'
 import { seats, suits, ranks } from '../shared/protocol.ts'
@@ -45,7 +45,7 @@ const vulnerabilities: BoardView['vulnerability'][] = [
 ]
 
 export function dealBoard(
-  members: Member[],
+  members: Pick<Member, 'id' | 'seat'>[],
   deck: Card[],
   number = 1,
 ): StoredBoard {
@@ -78,15 +78,16 @@ export function dealBoard(
 export function visibleBoard(
   board: StoredBoard,
   selfId: string,
+  computerMembers: readonly string[] = [],
 ): Pick<RoomState, 'board' | 'hand'> {
   const publicSeats = {} as BoardView['seats']
   for (const seat of seats) {
     publicSeats[seat] = {
       ready: Boolean(
-        board.score && (board.occupants[seat] === null || board.ready?.[seat]),
+        board.score && (seatController(board, seat, computerMembers) === null || board.ready?.[seat]),
       ),
       memberId: board.occupants[seat],
-      controller: board.occupants[seat] ? 'human' : 'computer',
+      controller: seatController(board, seat, computerMembers) === null ? 'computer' : 'human',
       cardCount: board.hands[seat].length,
     }
   }
@@ -113,8 +114,8 @@ export function visibleBoard(
               hand: [...board.hands[dummySeat(board)!]],
             }
           : null,
-      legalCards: playController(board) === selfId ? legalCards(board) : [],
-      legalCalls: ownSeat === board.turn ? legalCalls(board) : [],
+      legalCards: playController(board, board.turn, computerMembers) === selfId ? legalCards(board) : [],
+      legalCalls: ownSeat === board.turn && ownSeat && seatController(board, ownSeat, computerMembers) === selfId ? legalCalls(board) : [],
     },
     hand: ownSeat ? [...board.hands[ownSeat]] : [],
   }

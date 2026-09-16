@@ -1,6 +1,7 @@
+import { ConnectionStatus } from './ConnectionStatus.tsx'
 import { ConventionHelp } from './ConventionHelp.tsx'
 import { ScoreTotals } from './ScorePanel.tsx'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { seats, seatNames } from '../shared/protocol.ts'
 import type {
@@ -39,6 +40,7 @@ export default function App() {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [connected, setConnected] = useState(false)
+  const wasDisconnected = useRef(false)
   const [restoring, setRestoring] = useState(Boolean(session?.code))
 
   function save(value: Session) {
@@ -62,16 +64,26 @@ export default function App() {
       setMessage('')
     })
     socket.on('disconnect', () => {
+      wasDisconnected.current = true
       setConnected(false)
-      setMessage('连接中断，正在重连。座位会为你保留。')
+      setMessage('连接中断，正在重连。服务端检测掉线后等待 30 秒，之后由电脑接管；你的座位仍会保留。')
     })
     socket.on('connect_error', () => {
       setConnected(false)
       setMessage('暂时无法恢复房间，请检查网络或重试。')
       setRestoring(false)
     })
+    socket.on('presence_error', (message: string) => {
+      setConnected(false)
+      setMessage(message)
+    })
     socket.on('state', (next: RoomState) => {
+      setConnected(true)
       update(next)
+      if (wasDisconnected.current && next.members.find((member) => member.id === next.selfId)?.connection.status === 'online') {
+        setMessage('已重连并取回座位控制；电脑已提交的操作保留，请按当前轮次继续。')
+        wasDisconnected.current = false
+      }
       setRestoring(false)
     })
     return () => {
@@ -229,6 +241,7 @@ export default function App() {
       })
   }
   const self = state?.members.find((m) => m.id === state.selfId)
+  const actionLocked = busy || !!session?.pending || !connected || !!state?.pause || self?.connection.status !== 'online'
   return (
     <main>
       <header className="masthead">
@@ -251,7 +264,7 @@ export default function App() {
             : state?.pause
               ? '牌桌仍处于暂停状态，等待房主恢复。'
               : state?.board
-                ? '请查看当前行动方与公开叫牌记录。'
+                ? '身份与座位控制已恢复，请查看当前行动方与公开记录。'
                 : '南北搭档，东西搭档。选好座位，等朋友到齐。')}
         {session?.pending && (
           <button disabled={busy} onClick={() => void send(session.pending!)}>
@@ -381,7 +394,7 @@ export default function App() {
           <div className="room-layout">
             <PlayTable
               state={state}
-              locked={busy || !!session?.pending || !connected || !!state.pause}
+              locked={actionLocked}
               onChoose={choose}
               onPlay={play}
             />
@@ -391,7 +404,7 @@ export default function App() {
               {state.board && (
                 <AuctionPanel
                   board={state.board}
-                  locked={busy || !!session?.pending || !connected || !!state.pause}
+                  locked={actionLocked}
                   onCall={call}
                 />
               )}
@@ -407,7 +420,7 @@ export default function App() {
                         <span>
                           {seatNames[seat]}家 ·{' '}
                           {state.board!.seats[seat].controller === 'computer'
-                            ? '电脑牌手'
+                            ? state.board!.seats[seat].memberId ? '电脑接管' : '电脑牌手'
                             : state.members.find(
                                 (m) =>
                                   m.id === state.board!.seats[seat].memberId,
@@ -424,10 +437,7 @@ export default function App() {
                     <button
                       className="primary"
                       disabled={
-                        busy ||
-                        !!session?.pending ||
-                        !connected ||
-                        !!state.pause ||
+                        actionLocked ||
                         state.board.seats[self.seat].ready
                       }
                       onClick={() => advanceBoard('ready')}
@@ -462,6 +472,7 @@ export default function App() {
                             ? '等待下一副'
                             : '正在选座'}
                       </small>
+                      <ConnectionStatus member={m} />
                     </div>
                   </li>
                 ))}

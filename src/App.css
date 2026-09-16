@@ -710,3 +710,16 @@ button.playing-card.selected {
   min-height: 44px;
   flex-shrink: 0;
 }
+
+.member-connection {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #526b59;
+  overflow-wrap: anywhere;
+}
+.member-connection.waiting,
+.member-connection.taken-over {
+  color: #775b28;
+}

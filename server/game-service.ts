@@ -1,7 +1,7 @@
 import { playRules } from '../shared/computer-play.ts'
 import type { PlayInput, PlayDecision } from '../shared/computer-play.ts'
 import { scoreContract, sideOf } from './scoring.ts'
-import { dummySeat, legalCards, applyPlay, playController } from './play.ts'
+import { dummySeat, legalCards, applyPlay, playController, seatController } from './play.ts'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import type {
@@ -16,6 +16,7 @@ import type {
   JoinVersion,
   Result,
   RoomState,
+  Member,
 } from '../shared/protocol.ts'
 
 import { shuffledDeck, dealBoard, visibleBoard } from './deal.ts'
@@ -38,11 +39,17 @@ type ComputerAuthority = {
   version: number
 }
 
-type StoredRoom = Omit<RoomState, 'selfId' | 'board' | 'hand' | 'scores' | 'pause'> & {
+type StoredRoom = Omit<RoomState, 'selfId' | 'board' | 'hand' | 'scores' | 'pause' | 'members'> & {
+  members: Omit<Member, 'connection'>[]
+  offline?: Record<string, { deadline: number; takenOver: boolean }>
   pause?: RoomState['pause']
   scores?: RoomState['scores']
   board?: StoredBoard
 }
+function computerMembers(room: StoredRoom): string[] {
+  return Object.entries(room.offline ?? {}).filter(([, state]) => state.takenOver).map(([id]) => id)
+}
+
 // 在调用者的写事务内结算，结果存在即不再累计。
 function settleRoom(room: StoredRoom): boolean {
   const board = room.board
@@ -66,15 +73,25 @@ function settleRoom(room: StoredRoom): boolean {
 }
 function visibleRoom(room: StoredRoom, selfId: string): RoomState {
   const visible = room.board
-    ? visibleBoard(room.board, selfId)
+    ? visibleBoard(room.board, selfId, computerMembers(room))
     : { board: null, hand: [] }
+  if (visible.board && room.offline?.[selfId]) {
+    visible.board.legalCalls = []
+    visible.board.legalCards = []
+  }
   return {
     scores: { ...(room.scores ?? { 'north-south': 0, 'east-west': 0 }) },
     pause: room.pause ?? null,
     code: room.code,
     version: room.version,
     hostId: room.hostId,
-    members: room.members.map((member) => ({ ...member })),
+    members: room.members.map((member) => ({
+      ...member,
+      connection: {
+        status: room.offline?.[member.id]?.takenOver ? 'taken-over' : room.offline?.[member.id] ? 'waiting' : 'online',
+        deadline: room.offline?.[member.id]?.deadline ?? null,
+      },
+    })),
     selfId,
     ...visible,
   }
@@ -86,8 +103,13 @@ export class GameService {
   private computerTurns = new WeakMap<ComputerTurn | ComputerPlayTurn, ComputerAuthority>()
   private db: DatabaseSync
   private deck: () => Card[]
-  constructor(path: string, options: { deck?: () => Card[] } = {}) {
+  private now: () => number
+  private connections = new Map<string, { code: string; memberId: string }>()
+  // 网络观察独立于存档；保存失败时保留原检测时间，tick 会重试。
+  private observed = new Map<string, Map<string, number | null>>()
+  constructor(path: string, options: { deck?: () => Card[]; now?: () => number } = {}) {
     this.deck = options.deck ?? shuffledDeck
+    this.now = options.now ?? Date.now
     this.db = new DatabaseSync(path)
     this.db.exec(`PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 1000;
       CREATE TABLE IF NOT EXISTS identities (hash TEXT PRIMARY KEY, room TEXT, member TEXT);
@@ -115,6 +137,85 @@ export class GameService {
       }
       throw error
     }
+  }
+  // 仅供服务端连接适配器使用，不接受浏览器提交在线状态。
+  connect(code: string, credential: string, connectionId: string): Result {
+    const result = this.read(code, credential)
+    if (result.status !== 'accepted') return result
+    const memberId = result.state.selfId
+    const previous = this.connections.get(connectionId)
+    if (previous && (previous.code !== code || previous.memberId !== memberId))
+      return { status: 'unauthorized', message: '连接已绑定其他身份。' }
+    this.connections.set(connectionId, { code, memberId })
+    this.observe(code, memberId, null)
+    return this.reconcilePresence(code, memberId)
+  }
+  disconnect(connectionId: string): Result | null {
+    const connection = this.connections.get(connectionId)
+    if (!connection) return null
+    this.connections.delete(connectionId)
+    const { code, memberId } = connection
+    if (![...this.connections.values()].some((other) => other.code === code && other.memberId === memberId))
+      this.observe(code, memberId, this.now() + 30_000)
+    return this.reconcilePresence(code, memberId)
+  }
+  private observe(code: string, memberId: string, deadline: number | null) {
+    let members = this.observed.get(code)
+    if (!members) this.observed.set(code, members = new Map())
+    members.set(memberId, deadline)
+  }
+  tick(): string[] {
+    const changed: string[] = []
+    for (const row of this.db.prepare('SELECT code FROM rooms').all()) {
+      const code = String(row.code)
+      const result = this.reconcilePresence(code, '')
+      if (result.status === 'accepted' && result.appliedVersion !== undefined) changed.push(code)
+    }
+    return changed
+  }
+  private reconcilePresence(code: string, selfId: string): Result {
+    try {
+      this.db.exec('BEGIN IMMEDIATE')
+      const room = this.room(code)
+      if (!room) {
+        this.db.exec('ROLLBACK')
+        return { status: 'room_not_found', message: '房间不存在。' }
+      }
+      const before = JSON.stringify(room.offline ?? {})
+      const offline = room.offline ??= {}
+      for (const [memberId, deadline] of this.observed.get(code) ?? []) {
+        if (deadline === null) delete offline[memberId]
+        else offline[memberId] ??= { deadline, takenOver: false }
+      }
+      for (const state of Object.values(offline)) {
+        if (state.deadline <= this.now()) state.takenOver = true
+      }
+      if (before === JSON.stringify(offline)) {
+        this.db.exec('ROLLBACK')
+        return { status: 'accepted', state: visibleRoom(room, selfId) }
+      }
+      this.advanceReadyBoard(room)
+      this.persistRoom(room, `presence:${code}`, `version-${room.version + 1}`, JSON.stringify(offline))
+      this.db.exec('COMMIT')
+      return { status: 'accepted', state: visibleRoom(room, selfId), appliedVersion: room.version }
+    } catch {
+      try { this.db.exec('ROLLBACK') } catch { /* BEGIN 失败时没有事务。 */ }
+      return { status: 'storage_failure', message: '连接状态保存失败，正在重试。' }
+    }
+  }
+  private advanceReadyBoard(room: StoredRoom) {
+    const board = room.board
+    if (!board?.score || room.pause) return
+    const computers = computerMembers(room)
+    if (seats.every((seat) => seatController(board, seat, computers) === null || board.ready?.[seat]))
+      room.board = dealBoard(room.members, this.deck(), board.number + 1)
+  }
+  private persistRoom(room: StoredRoom, identity: string, operationId: string, fingerprint: string) {
+    room.version++
+    this.db.prepare('INSERT INTO rooms(code, state) VALUES (?, ?) ON CONFLICT(code) DO UPDATE SET state = excluded.state')
+      .run(room.code, JSON.stringify(room))
+    this.db.prepare('INSERT INTO operations VALUES (?, ?, ?, ?)')
+      .run(identity, operationId, fingerprint, room.version)
   }
   close() {
     this.db.close()
@@ -183,7 +284,7 @@ export class GameService {
       !board ||
       board.phase !== 'auction' ||
       !board.turn ||
-      board.occupants[board.turn] !== null
+      seatController(board, board.turn, computerMembers(room!)) !== null
     )
       return null
     const turn: ComputerTurn = {
@@ -209,7 +310,7 @@ export class GameService {
   computerPlayTurn(code: string): ComputerPlayTurn | null {
     const room = this.room(code)
     const board = room?.board
-    if (room?.pause || !board || !['opening-lead', 'playing'].includes(board.phase) || !board.turn || !board.contract || playController(board) !== null)
+    if (room?.pause || !board || !['opening-lead', 'playing'].includes(board.phase) || !board.turn || !board.contract || playController(board, board.turn, computerMembers(room!)) !== null)
       return null
     const dummy = dummySeat(board)!
     const controller = board.turn === dummy ? board.contract.declarer : board.turn
@@ -458,7 +559,7 @@ export class GameService {
             computer &&
             (command.kind !== computer.kind ||
               !room.board ||
-              room.board.occupants[computer.seat] !== null ||
+              seatController(room.board, computer.seat, computerMembers(room)) !== null ||
               (computer.kind === 'call'
                 ? room.board.phase !== 'auction' || room.board.turn !== computer.seat
                 : !['opening-lead', 'playing'].includes(room.board.phase) ||
@@ -470,6 +571,8 @@ export class GameService {
             ? { id: '', nickname: '', joinedOrder: 0, seat: computer.seat }
             : room.members.find((m) => m.id === memberId)
           if (!member) return reject('unauthorized', '你不属于这个房间。')
+          if (!computer && room.offline?.[memberId] && ['call', 'play', 'ready'].includes(command.kind))
+            return reject('unauthorized', '你的座位正在等待重连或由电脑接管，请先恢复连接。')
           if (room.pause && !['pause', 'resume', 'seat'].includes(command.kind))
             return reject('paused', '牌桌已暂停，请等待房主恢复。')
           if (command.kind === 'pause' || command.kind === 'resume') {
@@ -488,23 +591,13 @@ export class GameService {
               return reject('unauthorized', '你未参与本副，不能准备。')
             board.ready ??= {}
             board.ready[member.seat] = true
-            if (
-              seats.every(
-                (seat) => board.occupants[seat] === null || board.ready?.[seat],
-              )
-            )
-              room.board = dealBoard(
-                room.members,
-                this.deck(),
-                board.number + 1,
-              )
           } else if (command.kind === 'play') {
             if (
               !room.board ||
               !['opening-lead', 'playing'].includes(room.board.phase)
             )
               return reject('illegal_action', '当前不在出牌阶段。')
-            if (computer ? command.seat !== computer.handSeat || playController(room.board, command.seat) !== null : playController(room.board, command.seat) !== memberId)
+            if (computer ? command.seat !== computer.handSeat || playController(room.board, command.seat, computerMembers(room)) !== null : playController(room.board, command.seat, computerMembers(room)) !== memberId)
               return reject('unauthorized', '你无权操作这手牌。')
             if (!applyPlay(room.board, command.seat, command.card))
               return reject(
@@ -551,19 +644,12 @@ export class GameService {
         }
       }
       settleRoom(room)
-      room.version++
-      this.db
-        .prepare(
-          'INSERT INTO rooms(code, state) VALUES (?, ?) ON CONFLICT(code) DO UPDATE SET state = excluded.state',
-        )
-        .run(room.code, JSON.stringify(room))
+      this.advanceReadyBoard(room)
+      this.persistRoom(room, hash, command.operationId, fingerprint)
       if (!computer)
         this.db
           .prepare('UPDATE identities SET room = ?, member = ? WHERE hash = ?')
           .run(room.code, memberId, hash)
-      this.db
-        .prepare('INSERT INTO operations VALUES (?, ?, ?, ?)')
-        .run(hash, command.operationId, fingerprint, room.version)
       this.db.exec('COMMIT')
       return {
         status: 'accepted',

@@ -7,14 +7,21 @@ export function dummySeat(board: StoredBoard): Seat | null {
     ? seats[(seats.indexOf(board.contract.declarer) + 2) % 4]
     : null
 }
+export function seatController(
+  board: StoredBoard,
+  seat: Seat,
+  computerMembers: readonly string[] = [],
+): string | null {
+  const owner = board.occupants[seat]
+  return owner && computerMembers.includes(owner) ? null : owner
+}
 export function playController(
   board: StoredBoard,
   seat = board.turn,
+  computerMembers: readonly string[] = [],
 ): string | null {
   if (!seat || !board.contract) return null
-  return board.occupants[
-    seat === dummySeat(board) ? board.contract.declarer : seat
-  ]
+  return seatController(board, seat === dummySeat(board) ? board.contract.declarer : seat, computerMembers)
 }
 export function legalCards(board: StoredBoard): Card[] {
   if (!board.turn || !['opening-lead', 'playing'].includes(board.phase))

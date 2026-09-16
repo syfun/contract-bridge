@@ -1,12 +1,12 @@
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
-import { Server } from 'socket.io'
+import { Server, type Socket } from 'socket.io'
 import { resolve } from 'node:path'
 import { ComputerRunner } from './computer/runner.ts'
 import { GameService } from './game-service.ts'
 
-export async function createApp(databasePath: string) {
-  const service = new GameService(databasePath)
+export async function createApp(databasePath: string, options: { now?: () => number } = {}) {
+  const service = new GameService(databasePath, options)
   const app = Fastify({ bodyLimit: 8192 })
   const io = new Server(app.server, { maxHttpBufferSize: 8192 })
   const broadcast = (roomCode: string) => {
@@ -20,6 +20,32 @@ export async function createApp(databasePath: string) {
     }
   }
   const computer = new ComputerRunner(service, broadcast)
+  const changed = (code: string) => {
+    broadcast(code)
+    void computer.advance(code)
+  }
+  const pendingConnections = new Set<Socket>()
+  const synchronizeConnection = (socket: Socket) => {
+    const { code, credential } = socket.data
+    const result = service.connect(code, credential, socket.id)
+    if (result.status === 'accepted') {
+      pendingConnections.delete(socket)
+      if (result.appliedVersion !== undefined) changed(code)
+      else socket.emit('state', result.state)
+    } else if (result.status === 'storage_failure') {
+      pendingConnections.add(socket)
+      socket.emit('presence_error', result.message)
+    } else socket.disconnect(true)
+  }
+  const timer = setInterval(() => {
+    try {
+      for (const socket of pendingConnections) synchronizeConnection(socket)
+      for (const code of service.tick()) changed(code)
+    } catch (error) {
+      app.log.error(error, '连接状态检查失败，将重试')
+    }
+  }, 250)
+  timer.unref()
   await app.register(fastifyStatic, { root: resolve('dist') })
   app.post('/api/identity', (_request, reply) => {
     reply.header('Cache-Control', 'no-store')
@@ -53,8 +79,7 @@ export async function createApp(databasePath: string) {
     reply.header('Cache-Control', 'no-store')
     const result = service.execute(request.body)
     if (result.status === 'accepted') {
-      broadcast(result.state.code)
-      void computer.advance(result.state.code)
+      changed(result.state.code)
     }
     return result
   })
@@ -68,10 +93,17 @@ export async function createApp(databasePath: string) {
     next()
   })
   io.on('connection', (socket) => {
-    const result = service.read(socket.data.code, socket.data.credential)
-    if (result.status === 'accepted') socket.emit('state', result.state)
+    // 握手完成才登记；中途取消的握手不会留下幽灵连接。
+    socket.on('disconnect', () => {
+      pendingConnections.delete(socket)
+      const disconnected = service.disconnect(socket.id)
+      if (disconnected?.status === 'accepted' && disconnected.appliedVersion !== undefined)
+        changed(socket.data.code)
+    })
+    synchronizeConnection(socket)
   })
   app.addHook('preClose', async () => {
+    clearInterval(timer)
     await computer.close()
     await new Promise<void>((resolve) => io.close(() => resolve()))
   })

@@ -1,3 +1,4 @@
+import { ConnectionStatus } from './ConnectionStatus.tsx'
 import { ScorePanel } from './ScorePanel.tsx'
 import { HandPanel } from './HandPanel.tsx'
 import { cardLabel } from './card-label.ts'
@@ -79,6 +80,7 @@ export function PlayTable({
                     ? '电脑座位'
                     : '点击入座'}
               </small>
+              {member && member.connection.status !== 'online' && <ConnectionStatus member={member} />}
               {board && (
                 <span className="card-count">
                   {board.seats[seat].cardCount} 张牌

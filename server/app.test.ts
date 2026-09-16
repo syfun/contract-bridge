@@ -44,6 +44,13 @@ test(
     })
     if (created.status !== 'accepted') throw Error(created.message)
     const code = created.state.code
+    const snapshot = async (credential: string): Promise<RoomState> => {
+      const result = await (await fetch(`${url}/api/rooms/${code}`, {
+        headers: { Authorization: `Bearer ${credential}` },
+      })).json() as Result
+      if (result.status !== 'accepted') throw Error(result.message)
+      return result.state
+    }
     const joined = await submit({
       kind: 'join',
       credential: guest,
@@ -94,7 +101,7 @@ test(
       credential: guest,
       operationId: 'seat',
       code,
-      expectedVersion: 2,
+      expectedVersion: (await snapshot(host)).version,
       seat: 'east',
     })
     assert.equal(seated.status, 'accepted')
@@ -105,7 +112,7 @@ test(
     assert.notEqual(aState.selfId, bState.selfId)
     b.socket.disconnect()
     const recovered = await connect(guest)
-    assert.deepEqual(recovered.state, bState)
+    assert.deepEqual(recovered.state, { ...bState, version: recovered.state.version })
 
     const hostSeated = once(a.socket, 'state')
     const guestSeated = once(recovered.socket, 'state')
@@ -114,7 +121,7 @@ test(
       credential: host,
       operationId: 'host-seat',
       code,
-      expectedVersion: 3,
+      expectedVersion: (await snapshot(host)).version,
       seat: 'north',
     })
     assert.equal(hostSeat.status, 'accepted')
@@ -127,7 +134,7 @@ test(
       operationId: 'waiting',
       code,
       nickname: '等待者',
-      expectedVersion: 4,
+      expectedVersion: (await snapshot(host)).version,
     })
     assert.equal(waiting.status, 'accepted')
     await Promise.all([hostJoined, guestJoined])
@@ -140,7 +147,7 @@ test(
       credential: host,
       operationId: 'start',
       code,
-      expectedVersion: 5,
+      expectedVersion: (await snapshot(host)).version,
     })
     if (started.status !== 'accepted') throw Error(started.message)
     const [hostState] = await hostDeal
@@ -193,7 +200,7 @@ test(
       credential: host,
       operationId: 'stale',
       code,
-      expectedVersion: 5,
+      expectedVersion: started.state.version - 1,
     })
     assert.deepEqual(stale, {
       status: 'stale_state',
@@ -201,13 +208,8 @@ test(
     })
     recovered.socket.disconnect()
     const restoredDeal = await connect(guest)
-    assert.deepEqual(restoredDeal.state, guestState)
-    const snapshot = await (
-      await fetch(`${url}/api/rooms/${code}`, {
-        headers: { Authorization: `Bearer ${guest}` },
-      })
-    ).json()
-    assert.deepEqual(snapshot, { status: 'accepted', state: guestState })
+    assert.deepEqual(restoredDeal.state, { ...guestState, version: restoredDeal.state.version })
+    assert.deepEqual(await snapshot(guest), restoredDeal.state)
     const hostCall = once(a.socket, 'state')
     const guestCall = once(restoredDeal.socket, 'state')
     const waitingCall = once(observer.socket, 'state')
@@ -216,7 +218,7 @@ test(
       credential: host,
       code,
       operationId: 'call',
-      expectedVersion: 6,
+      expectedVersion: (await snapshot(host)).version,
       call: { kind: 'bid', level: 1, denomination: 'H' },
     })
     if (called.status !== 'accepted') throw Error(called.message)
@@ -236,6 +238,7 @@ test(
     )
     assert.deepEqual(updates[2][0].board!.legalCalls, [])
     restoredDeal.socket.disconnect()
-    assert.deepEqual((await connect(guest)).state, updates[1][0])
+    const final = (await connect(guest)).state
+    assert.deepEqual(final, { ...updates[1][0], version: final.version })
   },
 )

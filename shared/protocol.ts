@@ -7,6 +7,7 @@ export const seatNames: Record<Seat, string> = {
   west: '西',
 }
 export interface Member {
+  connection: { status: 'online' | 'waiting' | 'taken-over'; deadline: number | null }
   id: string
   nickname: string
   joinedOrder: number
