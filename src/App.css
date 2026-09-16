@@ -639,3 +639,49 @@ button.playing-card.selected {
   flex-shrink: 0;
   color: #355b42;
 }
+
+.convention-help {
+  width: min(760px, calc(100vw - 32px));
+  max-height: 85vh;
+  box-sizing: border-box;
+  overflow-y: auto;
+  border: 1px solid #b7cbb6;
+  border-radius: 16px;
+  padding: 24px;
+  color: #294536;
+  background: #f8faf3;
+}
+.convention-help::backdrop {
+  background: #18362799;
+}
+.convention-help header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.convention-help h2 {
+  margin-bottom: 8px;
+}
+.convention-help h3 {
+  margin-top: 28px;
+}
+.convention-help p,
+.convention-help dd {
+  line-height: 1.7;
+}
+.convention-help dl > div {
+  border-top: 1px solid #d7e2d8;
+  padding: 12px 0;
+}
+.convention-help dt {
+  font-weight: 700;
+}
+.convention-help dd {
+  margin: 6px 0 0;
+}
+.convention-help summary {
+  cursor: pointer;
+  padding: 12px 0;
+}

@@ -2,12 +2,24 @@ import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import { Server } from 'socket.io'
 import { resolve } from 'node:path'
+import { ComputerAuctionRunner } from './computer/runner.ts'
 import { GameService } from './game-service.ts'
 
 export async function createApp(databasePath: string) {
   const service = new GameService(databasePath)
   const app = Fastify({ bodyLimit: 8192 })
   const io = new Server(app.server, { maxHttpBufferSize: 8192 })
+  const broadcast = (roomCode: string) => {
+    // 每个连接重新授权并生成自己的状态；不能广播发起者的 selfId。
+    for (const socket of io.sockets.sockets.values()) {
+      const { code, credential } = socket.data
+      if (code === roomCode) {
+        const visible = service.read(code, credential)
+        if (visible.status === 'accepted') socket.emit('state', visible.state)
+      }
+    }
+  }
+  const computer = new ComputerAuctionRunner(service, broadcast)
   await app.register(fastifyStatic, { root: resolve('dist') })
   app.post('/api/identity', (_request, reply) => {
     reply.header('Cache-Control', 'no-store')
@@ -41,14 +53,8 @@ export async function createApp(databasePath: string) {
     reply.header('Cache-Control', 'no-store')
     const result = service.execute(request.body)
     if (result.status === 'accepted') {
-      // 每个连接重新授权并生成自己的状态；不能广播发起者的 selfId。
-      for (const socket of io.sockets.sockets.values()) {
-        const { code, credential } = socket.data
-        if (code === result.state.code) {
-          const visible = service.read(code, credential)
-          if (visible.status === 'accepted') socket.emit('state', visible.state)
-        }
-      }
+      broadcast(result.state.code)
+      void computer.advance(result.state.code)
     }
     return result
   })
@@ -66,6 +72,7 @@ export async function createApp(databasePath: string) {
     if (result.status === 'accepted') socket.emit('state', result.state)
   })
   app.addHook('preClose', async () => {
+    await computer.close()
     await new Promise<void>((resolve) => io.close(() => resolve()))
   })
   app.addHook('onClose', async () => {

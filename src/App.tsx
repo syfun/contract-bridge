@@ -1,3 +1,4 @@
+import { ConventionHelp } from './ConventionHelp.tsx'
 import { ScoreTotals } from './ScorePanel.tsx'
 import { useEffect, useState } from 'react'
 import { io } from 'socket.io-client'
@@ -360,6 +361,7 @@ export default function App() {
               onPlay={play}
             />
             <aside className="panel members">
+              <ConventionHelp />
               <ScoreTotals scores={state.scores} />
               {state.board && (
                 <AuctionPanel
@@ -382,7 +384,8 @@ export default function App() {
                           {state.board!.seats[seat].controller === 'computer'
                             ? '电脑牌手'
                             : state.members.find(
-                                (m) => m.id === state.board!.seats[seat].memberId,
+                                (m) =>
+                                  m.id === state.board!.seats[seat].memberId,
                               )?.nickname}
                         </span>
                         <strong>
@@ -467,7 +470,7 @@ export default function App() {
               <p className="room-note">
                 同一浏览器刷新后会恢复身份和座位。
                 <br />
-                电脑牌手暂不自动行动。
+                电脑自动叫牌；自动出牌将在后续版本提供。
               </p>
             </aside>
           </div>

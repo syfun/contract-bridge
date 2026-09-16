@@ -2,7 +2,12 @@ import { scoreContract, sideOf } from './scoring.ts'
 import { applyPlay, playController } from './play.ts'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
-import { applyCall, isCall } from './auction.ts'
+import type {
+  AuctionInput,
+  AuctionDecision,
+} from '../shared/computer-auction.ts'
+import { conventionVersion, conventions } from '../shared/conventions.ts'
+import { applyCall, isCall, legalCalls } from './auction.ts'
 import { seats } from '../shared/protocol.ts'
 import type {
   Command,
@@ -14,6 +19,16 @@ import type {
 import { shuffledDeck, dealBoard, visibleBoard } from './deal.ts'
 import type { StoredBoard } from './deal.ts'
 import type { Card } from '../shared/protocol.ts'
+
+export interface ComputerTurn {
+  code: string
+  input: AuctionInput
+}
+type ComputerAuthority = {
+  code: string
+  seat: AuctionInput['seat']
+  version: number
+}
 
 type StoredRoom = Omit<RoomState, 'selfId' | 'board' | 'hand' | 'scores'> & {
   scores?: RoomState['scores']
@@ -58,6 +73,7 @@ const digest = (value: string) =>
   createHash('sha256').update(value).digest('hex')
 
 export class GameService {
+  private computerTurns = new WeakMap<ComputerTurn, ComputerAuthority>()
   private db: DatabaseSync
   private deck: () => Card[]
   constructor(path: string, options: { deck?: () => Card[] } = {}) {
@@ -148,7 +164,73 @@ export class GameService {
       return { status: 'storage_failure', message: '读取失败，请稍后重试。' }
     }
   }
+  // 仅服务端调度器可调用，不经 HTTP 暴露。逐字段投影，禁止传整个存档。
+  computerTurn(code: string): ComputerTurn | null {
+    const room = this.room(code)
+    const board = room?.board
+    if (
+      !board ||
+      board.phase !== 'auction' ||
+      !board.turn ||
+      board.occupants[board.turn] !== null
+    )
+      return null
+    const turn: ComputerTurn = {
+      code,
+      input: {
+        version: room!.version,
+        seat: board.turn,
+        dealer: board.dealer,
+        vulnerability: board.vulnerability,
+        hand: [...board.hands[board.turn]],
+        auction: structuredClone(board.auction),
+        legalCalls: legalCalls(board),
+      },
+    }
+    this.computerTurns.set(turn, {
+      code,
+      seat: board.turn,
+      version: room!.version,
+    })
+    return turn
+  }
+  submitComputerCall(turn: ComputerTurn, decision: AuctionDecision): Result {
+    const authority = this.computerTurns.get(turn)
+    if (!authority)
+      return { status: 'unauthorized', message: '无效的电脑行动授权。' }
+    if (
+      !decision ||
+      decision.version !== authority.version ||
+      decision.conventionVersion !== conventionVersion ||
+      !conventions.some((rule) => rule.id === decision.rule) ||
+      typeof decision.reason !== 'string' ||
+      decision.reason.length > 2048
+    )
+      return {
+        status: 'illegal_action',
+        message: '电脑建议格式或输入版本无效。',
+      }
+    return this.executeCommand(
+      {
+        kind: 'call',
+        code: authority.code,
+        credential: '',
+        operationId: `computer-${authority.version}-${authority.seat}`,
+        expectedVersion: authority.version,
+        call: decision.call,
+      },
+      authority,
+      decision,
+    )
+  }
   execute(input: unknown): Result {
+    return this.executeCommand(input)
+  }
+  private executeCommand(
+    input: unknown,
+    computer?: ComputerAuthority,
+    decision?: AuctionDecision,
+  ): Result {
     if (!input || typeof input !== 'object')
       return { status: 'illegal_action', message: '操作格式不正确。' }
     const command = input as Command
@@ -195,9 +277,11 @@ export class GameService {
         !/^[SHDC](?:[2-9]|10|[JQKA])$/.test(command.card))
     )
       return { status: 'illegal_action', message: '出牌格式不正确。' }
-    const hash = digest(command.credential)
+    const hash = computer
+      ? `computer:${computer.code}:${computer.seat}`
+      : digest(command.credential)
     // 不保存明文凭据；固定字段顺序使网络重试不依赖 JSON 键顺序。
-    const fingerprint = JSON.stringify(
+    const actionFingerprint = JSON.stringify(
       command.kind === 'create'
         ? [command.kind, command.nickname.trim()]
         : command.kind === 'join'
@@ -235,6 +319,9 @@ export class GameService {
                   ]
                 : [command.kind, command.code, command.expectedVersion],
     )
+    const fingerprint = computer
+      ? JSON.stringify([actionFingerprint, decision])
+      : actionFingerprint
     try {
       // 同步事务内无 await，操作在单一服务进程中顺序提交。
       this.db.exec('BEGIN IMMEDIATE')
@@ -245,9 +332,11 @@ export class GameService {
         this.db.exec('ROLLBACK')
         return { status, message }
       }
-      const identity = this.db
-        .prepare('SELECT room, member FROM identities WHERE hash = ?')
-        .get(hash)
+      const identity = computer
+        ? { room: computer.code, member: '' }
+        : this.db
+            .prepare('SELECT room, member FROM identities WHERE hash = ?')
+            .get(hash)
       if (!identity) return reject('unauthorized', '身份凭据无效，请重新进入。')
       const previous = this.db
         .prepare(
@@ -258,7 +347,12 @@ export class GameService {
         if (previous.command !== fingerprint)
           return reject('operation_conflict', '操作标识已用于其他操作。')
         this.db.exec('ROLLBACK')
-        const result = this.read(String(identity.room), command.credential)
+        const result: Result = computer
+          ? {
+              status: 'accepted',
+              state: visibleRoom(this.room(computer.code)!, ''),
+            }
+          : this.read(String(identity.room), command.credential)
         return result.status === 'accepted'
           ? { ...result, appliedVersion: Number(previous.version) }
           : result
@@ -314,7 +408,17 @@ export class GameService {
         } else {
           if (command.expectedVersion !== room.version)
             return reject('stale_state', '房间状态已更新，请重新操作。')
-          const member = room.members.find((m) => m.id === memberId)
+          if (
+            computer &&
+            (command.kind !== 'call' ||
+              room.board?.phase !== 'auction' ||
+              room.board.turn !== computer.seat ||
+              room.board.occupants[computer.seat] !== null)
+          )
+            return reject('unauthorized', '电脑已失去该座位的行动权。')
+          const member = computer
+            ? { id: '', nickname: '', joinedOrder: 0, seat: computer.seat }
+            : room.members.find((m) => m.id === memberId)
           if (!member) return reject('unauthorized', '你不属于这个房间。')
           if (command.kind === 'ready') {
             const board = room.board
@@ -329,7 +433,11 @@ export class GameService {
                 (seat) => board.occupants[seat] === null || board.ready?.[seat],
               )
             )
-              room.board = dealBoard(room.members, this.deck(), board.number + 1)
+              room.board = dealBoard(
+                room.members,
+                this.deck(),
+                board.number + 1,
+              )
           } else if (command.kind === 'play') {
             if (
               !room.board ||
@@ -346,7 +454,10 @@ export class GameService {
           } else if (command.kind === 'call') {
             if (!room.board || room.board.phase !== 'auction')
               return reject('illegal_action', '当前不在叫牌阶段。')
-            if (!member.seat || room.board.occupants[member.seat] !== memberId)
+            if (
+              !member.seat ||
+              (!computer && room.board.occupants[member.seat] !== memberId)
+            )
               return reject('unauthorized', '你未参与本副，不能叫牌。')
             if (room.board.turn !== member.seat)
               return reject('illegal_action', '尚未轮到你叫牌。')
@@ -386,9 +497,10 @@ export class GameService {
           'INSERT INTO rooms(code, state) VALUES (?, ?) ON CONFLICT(code) DO UPDATE SET state = excluded.state',
         )
         .run(room.code, JSON.stringify(room))
-      this.db
-        .prepare('UPDATE identities SET room = ?, member = ? WHERE hash = ?')
-        .run(room.code, memberId, hash)
+      if (!computer)
+        this.db
+          .prepare('UPDATE identities SET room = ?, member = ? WHERE hash = ?')
+          .run(room.code, memberId, hash)
       this.db
         .prepare('INSERT INTO operations VALUES (?, ?, ?, ?)')
         .run(hash, command.operationId, fingerprint, room.version)
