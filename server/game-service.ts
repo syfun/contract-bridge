@@ -8,13 +8,34 @@ import type {
   RoomState,
 } from '../shared/protocol.ts'
 
-type StoredRoom = Omit<RoomState, 'selfId'>
+import { shuffledDeck, dealBoard, visibleBoard } from './deal.ts'
+import type { StoredBoard } from './deal.ts'
+import type { Card } from '../shared/protocol.ts'
+
+type StoredRoom = Omit<RoomState, 'selfId' | 'board' | 'hand'> & {
+  board?: StoredBoard
+}
+function visibleRoom(room: StoredRoom, selfId: string): RoomState {
+  const visible = room.board
+    ? visibleBoard(room.board, selfId)
+    : { board: null, hand: [] }
+  return {
+    code: room.code,
+    version: room.version,
+    hostId: room.hostId,
+    members: room.members.map((member) => ({ ...member })),
+    selfId,
+    ...visible,
+  }
+}
 const digest = (value: string) =>
   createHash('sha256').update(value).digest('hex')
 
 export class GameService {
   private db: DatabaseSync
-  constructor(path: string) {
+  private deck: () => Card[]
+  constructor(path: string, options: { deck?: () => Card[] } = {}) {
+    this.deck = options.deck ?? shuffledDeck
     this.db = new DatabaseSync(path)
     this.db.exec(`PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 1000;
       CREATE TABLE IF NOT EXISTS identities (hash TEXT PRIMARY KEY, room TEXT, member TEXT);
@@ -55,7 +76,7 @@ export class GameService {
         }
       return {
         status: 'accepted',
-        state: { ...room, selfId: String(identity.member) },
+        state: visibleRoom(room, String(identity.member)),
       }
     } catch {
       return { status: 'storage_failure', message: '读取失败，请稍后重试。' }
@@ -90,7 +111,7 @@ export class GameService {
       command.operationId.length > 128
     )
       return { status: 'illegal_action', message: '缺少有效身份或操作标识。' }
-    if (!['create', 'join', 'seat'].includes(command.kind))
+    if (!['create', 'join', 'seat', 'start'].includes(command.kind))
       return { status: 'illegal_action', message: '不支持的操作。' }
     if (
       command.kind !== 'create' &&
@@ -101,7 +122,7 @@ export class GameService {
         message: '房间码应为六位字母或数字。',
       }
     if (
-      command.kind !== 'seat' &&
+      (command.kind === 'create' || command.kind === 'join') &&
       (typeof command.nickname !== 'string' ||
         !command.nickname.trim() ||
         command.nickname.trim().length > 20)
@@ -125,7 +146,14 @@ export class GameService {
               command.nickname.trim(),
               command.expectedVersion,
             ]
-          : [command.kind, command.code, command.expectedVersion, command.seat],
+          : command.kind === 'seat'
+            ? [
+                command.kind,
+                command.code,
+                command.expectedVersion,
+                command.seat,
+              ]
+            : [command.kind, command.code, command.expectedVersion],
     )
     try {
       // 同步事务内无 await，操作在单一服务进程中顺序提交。
@@ -178,7 +206,7 @@ export class GameService {
           ],
         }
       } else {
-        if (command.kind === 'seat' && identity.room !== command.code)
+        if (command.kind !== 'join' && identity.room !== command.code)
           return reject('unauthorized', '你无权操作这个房间。')
         const existing = this.room(command.code)
         if (!existing)
@@ -205,16 +233,31 @@ export class GameService {
           })
         } else {
           if (command.expectedVersion !== room.version)
-            return reject('stale_state', '座位状态已更新，请重新选择。')
+            return reject('stale_state', '房间状态已更新，请重新操作。')
           const member = room.members.find((m) => m.id === memberId)
           if (!member) return reject('unauthorized', '你不属于这个房间。')
-          if (
-            room.members.some(
-              (m) => m.seat === command.seat && m.id !== memberId,
+          if (command.kind === 'start') {
+            if (memberId !== room.hostId)
+              return reject('unauthorized', '只有房主可以开局。')
+            if (!member.seat)
+              return reject('illegal_action', '房主请先选择座位。')
+            if (room.board)
+              return reject('illegal_action', '本副已开始，不能重复开局。')
+            room.board = dealBoard(room.members, this.deck())
+          } else {
+            if (room.board)
+              return reject(
+                'illegal_action',
+                '本副已开始，请等待下一副再选座。',
+              )
+            if (
+              room.members.some(
+                (m) => m.seat === command.seat && m.id !== memberId,
+              )
             )
-          )
-            return reject('seat_taken', '这个座位已有人，请选择空位。')
-          member.seat = command.seat
+              return reject('seat_taken', '这个座位已有人，请选择空位。')
+            member.seat = command.seat
+          }
         }
       }
       room.version++
@@ -232,7 +275,7 @@ export class GameService {
       this.db.exec('COMMIT')
       return {
         status: 'accepted',
-        state: { ...room, selfId: memberId },
+        state: visibleRoom(room, memberId),
         appliedVersion: room.version,
       }
     } catch {

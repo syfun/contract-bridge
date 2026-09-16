@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { io } from 'socket.io-client'
-import { seats, seatNames } from '../shared/protocol.ts'
+import { seatNames } from '../shared/protocol.ts'
 import type {
   Command,
   JoinVersion,
@@ -9,6 +9,7 @@ import type {
   Seat,
 } from '../shared/protocol.ts'
 import './App.css'
+import { PlayTable } from './PlayTable.tsx'
 
 type Session = { credential: string; code?: string; pending?: Command }
 const storageKey = 'bridge-session'
@@ -96,7 +97,11 @@ export default function App() {
         setMessage(
           command.kind === 'seat'
             ? '座位已保存。'
-            : '已进入房间，选一个座位吧。',
+            : command.kind === 'start'
+              ? '本副已开始，手牌已保存。'
+              : result.state.board
+                ? '已加入，请等待下一副入座。'
+                : '已进入房间，选一个座位吧。',
         )
       } else {
         setMessage(result.message)
@@ -111,7 +116,7 @@ export default function App() {
       }
     } catch {
       setMessage(
-        '尚未确认操作。请检查网络，再点击“重试操作”；重复提交不会重复入房或选座。',
+        '尚未确认操作。请检查网络，再点击“重试操作”；重复提交不会重复执行操作。',
       )
     } finally {
       setBusy(false)
@@ -175,6 +180,16 @@ export default function App() {
         seat,
       })
   }
+  function start() {
+    if (state && session)
+      void send({
+        kind: 'start',
+        code: state.code,
+        credential: session.credential,
+        operationId: operationId(),
+        expectedVersion: state.version,
+      })
+  }
   const self = state?.members.find((m) => m.id === state.selfId)
   return (
     <main>
@@ -195,7 +210,9 @@ export default function App() {
         {message ||
           (restoring
             ? '正在恢复你的房间和座位…'
-            : '南北搭档，东西搭档。选好座位，等朋友到齐。')}
+            : state?.board
+              ? '本副已发牌；当前仅开放手牌查看，叫牌操作尚未开放。'
+              : '南北搭档，东西搭档。选好座位，等朋友到齐。')}
         {session?.pending && (
           <button disabled={busy} onClick={() => void send(session.pending!)}>
             重试操作
@@ -292,7 +309,9 @@ export default function App() {
               {self?.nickname}，
               {self?.seat
                 ? `你已坐在${seatNames[self.seat]}家`
-                : '请选择一个空位'}
+                : state.board
+                  ? '请等待下一副入座'
+                  : '请选择一个空位'}
               <br />
               <small>
                 房主：
@@ -301,36 +320,11 @@ export default function App() {
             </p>
           </section>
           <div className="room-layout">
-            <section className="table" aria-label="四方座位">
-              {seats.map((seat) => {
-                const member = state.members.find((m) => m.seat === seat)
-                const mine = member?.id === state.selfId
-                return (
-                  <button
-                    key={seat}
-                    className={`seat ${seat} ${mine ? 'mine' : ''}`}
-                    disabled={
-                      busy || !!session?.pending || !connected || !!member
-                    }
-                    onClick={() => choose(seat)}
-                    aria-label={`${seatNames[seat]}家，${member ? member.nickname : '空位，点击入座'}`}
-                  >
-                    <span className="direction">{seatNames[seat]}</span>
-                    <strong>{member?.nickname ?? '虚位以待'}</strong>
-                    <small>
-                      {member
-                        ? `${mine ? '你 · ' : ''}${member.id === state.hostId ? '房主' : '已入座'}`
-                        : '点击入座'}
-                    </small>
-                  </button>
-                )
-              })}
-              <div className="table-center">
-                <span aria-hidden="true">♣</span>
-                <h3>等待牌友入座</h3>
-                <p>南北一队 · 东西一队</p>
-              </div>
-            </section>
+            <PlayTable
+              state={state}
+              locked={busy || !!session?.pending || !connected}
+              onChoose={choose}
+            />
             <aside className="panel members">
               <h2>
                 本桌牌友 <small>{state.members.length} / 4</small>
@@ -347,16 +341,47 @@ export default function App() {
                       </strong>
                       <small>
                         {m.id === state.hostId ? '房主 · ' : ''}
-                        {m.seat ? `${seatNames[m.seat]}家` : '正在选座'}
+                        {m.seat
+                          ? `${seatNames[m.seat]}家`
+                          : state.board
+                            ? '等待下一副'
+                            : '正在选座'}
                       </small>
                     </div>
                   </li>
                 ))}
               </ol>
+              {!state.board && (
+                <div className="start-controls">
+                  {state.hostId === state.selfId ? (
+                    <>
+                      <button
+                        className="primary"
+                        disabled={
+                          busy ||
+                          !!session?.pending ||
+                          !connected ||
+                          !self?.seat
+                        }
+                        onClick={start}
+                      >
+                        开始第一副
+                      </button>
+                      <p className="muted">
+                        {self?.seat
+                          ? '空位将由电脑牌手补齐；未入座的牌友需等待下一副。'
+                          : '请先选择座位，再开始第一副。'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="muted">选好座位后，等待房主开局。</p>
+                  )}
+                </div>
+              )}
               <p className="room-note">
                 同一浏览器刷新后会恢复身份和座位。
                 <br />
-                当前开放建房、入房和选座。
+                电脑牌手暂不自动行动。
               </p>
             </aside>
           </div>

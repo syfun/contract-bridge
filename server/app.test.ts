@@ -8,7 +8,7 @@ import { createApp } from './app.ts'
 import type { Command, Result, RoomState } from '../shared/protocol.ts'
 
 test(
-  '同源服务提供页面，实时状态按身份隔离，重连读取最新座位',
+  '同源服务提供页面，选座与发牌按身份推送，错误及重连快照不泄露暗牌',
   { timeout: 10000 },
   async (t) => {
     const dir = mkdtempSync(join(tmpdir(), 'bridge-http-'))
@@ -106,5 +106,95 @@ test(
     b.socket.disconnect()
     const recovered = await connect(guest)
     assert.deepEqual(recovered.state, bState)
+
+    const hostSeated = once(a.socket, 'state')
+    const guestSeated = once(recovered.socket, 'state')
+    const hostSeat = await submit({
+      kind: 'seat',
+      credential: host,
+      operationId: 'host-seat',
+      code,
+      expectedVersion: 3,
+      seat: 'south',
+    })
+    assert.equal(hostSeat.status, 'accepted')
+    await Promise.all([hostSeated, guestSeated])
+    const hostJoined = once(a.socket, 'state')
+    const guestJoined = once(recovered.socket, 'state')
+    const waiting = await submit({
+      kind: 'join',
+      credential: outsider,
+      operationId: 'waiting',
+      code,
+      nickname: '等待者',
+      expectedVersion: 4,
+    })
+    assert.equal(waiting.status, 'accepted')
+    await Promise.all([hostJoined, guestJoined])
+    const observer = await connect(outsider)
+    const hostDeal = once(a.socket, 'state')
+    const guestDeal = once(recovered.socket, 'state')
+    const waitingDeal = once(observer.socket, 'state')
+    const started = await submit({
+      kind: 'start',
+      credential: host,
+      operationId: 'start',
+      code,
+      expectedVersion: 5,
+    })
+    if (started.status !== 'accepted') throw Error(started.message)
+    const [hostState] = await hostDeal
+    const [guestState] = await guestDeal
+    const [waitingState] = await waitingDeal
+    assert.deepEqual(started.state, hostState)
+    assert.equal(hostState.hand.length, 13)
+    assert.equal(guestState.hand.length, 13)
+    assert.deepEqual(waitingState.hand, [])
+    assert.equal(new Set([...hostState.hand, ...guestState.hand]).size, 26)
+    for (const state of [hostState, guestState, waitingState]) {
+      assert.deepEqual(Object.keys(state).sort(), [
+        'board',
+        'code',
+        'hand',
+        'hostId',
+        'members',
+        'selfId',
+        'version',
+      ])
+      assert.deepEqual(Object.keys(state.board!).sort(), [
+        'dealer',
+        'number',
+        'phase',
+        'seats',
+        'turn',
+        'vulnerability',
+      ])
+      for (const seat of Object.values(state.board!.seats))
+        assert.deepEqual(Object.keys(seat).sort(), [
+          'cardCount',
+          'controller',
+          'memberId',
+        ])
+    }
+    const stale = await submit({
+      kind: 'start',
+      credential: host,
+      operationId: 'stale',
+      code,
+      expectedVersion: 5,
+    })
+    assert.deepEqual(stale, {
+      status: 'stale_state',
+      message: '房间状态已更新，请重新操作。',
+    })
+    recovered.socket.disconnect()
+    const restoredDeal = await connect(guest)
+    assert.deepEqual(restoredDeal.state, guestState)
+    const snapshot = await (
+      await fetch(`${url}/api/rooms/${code}`, {
+        headers: { Authorization: `Bearer ${guest}` },
+      })
+    ).json()
+    assert.deepEqual(snapshot, { status: 'accepted', state: guestState })
   },
 )

@@ -357,3 +357,110 @@ footer {
     transition: background 0.15s;
   }
 }
+.play-area {
+  min-width: 0;
+}
+.board-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 12px 18px;
+  background: #fafbf5;
+  border: 1px solid #cbd5c4;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.seat.acting {
+  outline: 2px solid #aa7737;
+  outline-offset: 4px;
+}
+.card-count {
+  font-size: 12px;
+  color: #527447;
+  margin-top: 4px;
+}
+.hand-panel {
+  margin-top: 18px;
+  padding: 20px;
+}
+.hand-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hand-heading h2 {
+  font-size: 20px;
+  margin: 0;
+}
+.hand-heading small {
+  color: #61745c;
+}
+.hand-cards {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+  gap: 6px;
+}
+.playing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  min-height: 72px;
+  border: 1px solid #b5c3ad;
+  border-radius: 6px;
+  background: #fffef8;
+  color: #233d32;
+  font-size: 21px;
+  line-height: 1.3;
+  box-shadow: 0 2px 3px #203d3110;
+}
+.playing-card.red {
+  color: #a2493c;
+}
+.hand-panel .muted {
+  margin-bottom: 0;
+}
+.start-controls {
+  border-top: 1px solid #d8dfd0;
+  padding-top: 20px;
+}
+.start-controls button {
+  width: 100%;
+}
+.waiting {
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.waiting > span {
+  font-size: 44px;
+}
+.waiting h2 {
+  margin: 16px 0;
+  font-size: 24px;
+}
+@media (max-width: 760px) {
+  .board-summary {
+    gap: 6px 18px;
+    padding: 10px 12px;
+  }
+  .hand-panel {
+    padding: 16px;
+  }
+  .playing-card {
+    width: 42px;
+    min-height: 66px;
+  }
+  .hand-heading h2 {
+    font-size: 18px;
+  }
+}
