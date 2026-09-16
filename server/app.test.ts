@@ -158,6 +158,7 @@ test(
         'hand',
         'hostId',
         'members',
+        'scores',
         'selfId',
         'version',
       ])
@@ -171,6 +172,8 @@ test(
         'legalCards',
         'number',
         'phase',
+        'reviewHands',
+        'score',
         'seats',
         'tricks',
         'turn',

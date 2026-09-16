@@ -1,3 +1,4 @@
+import { ScorePanel } from './ScorePanel.tsx'
 import { HandPanel } from './HandPanel.tsx'
 import { cardLabel } from './card-label.ts'
 import { seats, seatNames } from '../shared/protocol.ts'
@@ -45,7 +46,7 @@ export function PlayTable({
             阶段：
             {board.phase === 'auction'
               ? '叫牌'
-              : board.phase === 'passed-out'
+              : board.score
                 ? '本副结束'
                 : board.phase === 'playing'
                   ? '打牌'
@@ -55,6 +56,7 @@ export function PlayTable({
           </span>
         </section>
       )}
+      {board?.score && <ScorePanel board={board} />}
       <section className="table" aria-label="四方座位">
         {seats.map((seat) => {
           const member = state.members.find((m) => m.seat === seat)
@@ -92,9 +94,11 @@ export function PlayTable({
             {board
               ? board.turn
                 ? `${seatNames[board.turn]}家${board.phase === 'auction' ? '叫牌' : board.phase === 'opening-lead' ? '首攻' : '出牌'}`
-                : board.phase === 'awaiting-score'
-                  ? '十三墩完成，待结算'
-                  : '四家不叫，本副结束'
+                : board.phase === 'scored'
+                  ? '十三墩完成，已结算'
+                  : board.phase === 'awaiting-score'
+                    ? '十三墩完成，待结算'
+                    : '四家不叫，本副结束'
               : '等待牌友入座'}
           </h3>
           <p>南北一队 · 东西一队</p>
@@ -103,7 +107,11 @@ export function PlayTable({
       {board && (
         <>
           <section className="panel trick-panel" aria-label="公开出牌记录">
-            <h2>当前墩 · 第 {Math.min(board.tricks.length + 1, 13)} 墩</h2>
+            <h2>
+              {board.score
+                ? '公开出牌记录'
+                : `当前墩 · 第 ${Math.min(board.tricks.length + 1, 13)} 墩`}
+            </h2>
             <p>
               {board.currentTrick.length
                 ? board.currentTrick
@@ -112,9 +120,11 @@ export function PlayTable({
                         `${seatNames[entry.seat]}家 ${cardLabel(entry.card)}`,
                     )
                     .join(' · ')
-                : board.phase === 'awaiting-score'
+                : board.phase === 'scored' || board.phase === 'awaiting-score'
                   ? '十三墩已全部完成。'
-                  : '等待首引。'}
+                  : board.phase === 'passed-out'
+                    ? '本副四家不叫，无出牌记录。'
+                    : '等待首引。'}
             </p>
             <p>
               南北{' '}
@@ -150,7 +160,7 @@ export function PlayTable({
               </ol>
             </details>
           </section>
-          {board.dummy && (
+          {!board.score && board.dummy && (
             <HandPanel
               key={`dummy-${state.version}`}
               hand={board.dummy.hand}
@@ -161,7 +171,7 @@ export function PlayTable({
               onPlay={onPlay}
             />
           )}
-          {self?.seat && self.seat !== board.dummy?.seat && (
+          {!board.score && self?.seat && self.seat !== board.dummy?.seat && (
             <HandPanel
               key={`own-${state.version}`}
               hand={state.hand}

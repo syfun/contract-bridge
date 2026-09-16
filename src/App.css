@@ -541,3 +541,78 @@ button.playing-card.selected {
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
+
+.score-totals {
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #cbd5c4;
+}
+.score-totals > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.score-totals strong {
+  font-size: 23px;
+}
+.score-totals small {
+  color: #61745c;
+}
+.score-panel {
+  margin: 18px 0;
+}
+.score-panel h2 {
+  margin: 12px 0;
+}
+.score-items {
+  max-width: 400px;
+}
+.score-items > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #d8dfd0;
+}
+.score-items dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.board-score {
+  font-size: 20px;
+}
+.review-hands summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.review-grid section {
+  background: #f0f4eb;
+  border-radius: 8px;
+  padding: 12px;
+}
+.review-grid h3 {
+  margin: 0 0 8px;
+}
+.review-grid p {
+  margin: 6px 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.review-grid p > span {
+  display: inline-block;
+  width: 18px;
+}
+.review-grid .red {
+  color: #a2493c;
+}
+@media (max-width: 480px) {
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+}

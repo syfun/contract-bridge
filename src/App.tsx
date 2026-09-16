@@ -1,3 +1,4 @@
+import { ScoreTotals } from './ScorePanel.tsx'
 import { useEffect, useState } from 'react'
 import { io } from 'socket.io-client'
 import { seatNames } from '../shared/protocol.ts'
@@ -357,6 +358,7 @@ export default function App() {
               onPlay={play}
             />
             <aside className="panel members">
+              <ScoreTotals scores={state.scores} />
               {state.board && (
                 <AuctionPanel
                   board={state.board}

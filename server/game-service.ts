@@ -1,3 +1,4 @@
+import { scoreContract, sideOf } from './scoring.ts'
 import { applyPlay, playController } from './play.ts'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
@@ -14,14 +15,37 @@ import { shuffledDeck, dealBoard, visibleBoard } from './deal.ts'
 import type { StoredBoard } from './deal.ts'
 import type { Card } from '../shared/protocol.ts'
 
-type StoredRoom = Omit<RoomState, 'selfId' | 'board' | 'hand'> & {
+type StoredRoom = Omit<RoomState, 'selfId' | 'board' | 'hand' | 'scores'> & {
+  scores?: RoomState['scores']
   board?: StoredBoard
+}
+// 在调用者的写事务内结算，结果存在即不再累计。
+function settleRoom(room: StoredRoom): boolean {
+  const board = room.board
+  if (
+    !board ||
+    board.score ||
+    !['passed-out', 'awaiting-score'].includes(board.phase)
+  )
+    return false
+  const tricks = board.contract
+    ? (board.tricks ?? []).filter(
+        (trick) => sideOf(trick.winner) === sideOf(board.contract!.declarer),
+      ).length
+    : 0
+  board.score = scoreContract(board.contract, tricks, board.vulnerability)
+  room.scores ??= { 'north-south': 0, 'east-west': 0 }
+  room.scores['north-south'] += board.score.delta['north-south']
+  room.scores['east-west'] += board.score.delta['east-west']
+  if (board.phase === 'awaiting-score') board.phase = 'scored'
+  return true
 }
 function visibleRoom(room: StoredRoom, selfId: string): RoomState {
   const visible = room.board
     ? visibleBoard(room.board, selfId)
     : { board: null, hand: [] }
   return {
+    scores: { ...(room.scores ?? { 'north-south': 0, 'east-west': 0 }) },
     code: room.code,
     version: room.version,
     hostId: room.hostId,
@@ -43,6 +67,28 @@ export class GameService {
       CREATE TABLE IF NOT EXISTS identities (hash TEXT PRIMARY KEY, room TEXT, member TEXT);
       CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS operations (identity TEXT, id TEXT, command TEXT, version INTEGER, PRIMARY KEY(identity, id));`)
+    // 第 05 票存档可能停在待结算或全体不叫；升级时一次性补齐结算。
+    try {
+      this.db.exec('BEGIN IMMEDIATE')
+      const rows = this.db.prepare('SELECT code, state FROM rooms').all()
+      for (const row of rows) {
+        const room: StoredRoom = JSON.parse(String(row.state))
+        if (settleRoom(room)) {
+          room.version++
+          this.db
+            .prepare('UPDATE rooms SET state = ? WHERE code = ?')
+            .run(JSON.stringify(room), String(row.code))
+        }
+      }
+      this.db.exec('COMMIT')
+    } catch (error) {
+      try {
+        this.db.exec('ROLLBACK')
+      } finally {
+        this.db.close()
+      }
+      throw error
+    }
   }
   close() {
     this.db.close()
@@ -319,6 +365,7 @@ export class GameService {
           }
         }
       }
+      settleRoom(room)
       room.version++
       this.db
         .prepare(

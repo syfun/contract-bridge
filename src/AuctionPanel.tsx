@@ -1,3 +1,4 @@
+import { doublingNames } from './contract-labels.ts'
 import { useState } from 'react'
 import { seatNames } from '../shared/protocol.ts'
 import type { BoardView, Call } from '../shared/protocol.ts'
@@ -44,7 +45,7 @@ export function AuctionPanel({
           : board.phase === 'passed-out'
             ? '本副结束，无定约。'
             : contract &&
-              `${contract.level} ${denominationNames[contract.denomination]} · ${{ undoubled: '未加倍', doubled: '加倍', redoubled: '再加倍' }[contract.doubling]}`}
+              `${contract.level} ${denominationNames[contract.denomination]} · ${doublingNames[contract.doubling]}`}
       </p>
       {contract && (
         <p>

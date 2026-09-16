@@ -82,7 +82,7 @@ function table(
   }
 }
 
-test('首攻后公开明手，仅庄家能控制明手，连续十三墩进入待结算', (t) => {
+test('首攻后公开明手，仅庄家能控制明手，连续十三墩完成并结算', (t) => {
   const room = table(t)
   assert.equal(room.read().board!.dummy, null)
   room.play('east', 'H2')
@@ -112,7 +112,7 @@ test('首攻后公开明手，仅庄家能控制明手，连续十三墩进入�
     room.play('north', `S${ranks[i - 1]}`)
   }
   const state = room.read()
-  assert.equal(state.board!.phase, 'awaiting-score')
+  assert.equal(state.board!.phase, 'scored')
   assert.equal(state.board!.turn, null)
   assert.equal(state.board!.tricks.length, 13)
   assert.deepEqual(

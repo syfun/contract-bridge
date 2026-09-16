@@ -21,6 +21,7 @@ export interface StoredBoard {
   occupants: Record<Seat, string | null>
   currentTrick?: BoardView['currentTrick']
   tricks?: BoardView['tricks']
+  score?: BoardView['score']
   hands: Record<Seat, Card[]>
 }
 
@@ -77,6 +78,8 @@ export function visibleBoard(
   const ownSeat = seats.find((seat) => board.occupants[seat] === selfId)
   return {
     board: {
+      score: board.score ? structuredClone(board.score) : null,
+      reviewHands: ownSeat && board.score ? originalHands(board) : null,
       number: board.number,
       dealer: board.dealer,
       vulnerability: board.vulnerability,
@@ -100,4 +103,15 @@ export function visibleBoard(
     },
     hand: ownSeat ? [...board.hands[ownSeat]] : [],
   }
+}
+
+// 已出牌记录加上剩余手牌可完整还原发牌，兼容没有原始手牌字段的旧存档。
+function originalHands(board: StoredBoard): Record<Seat, Card[]> {
+  const hands = structuredClone(board.hands)
+  for (const entry of [
+    ...(board.tricks ?? []).flatMap((trick) => trick.cards),
+    ...(board.currentTrick ?? []),
+  ])
+    hands[entry.seat].push(entry.card)
+  return hands
 }

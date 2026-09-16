@@ -53,6 +53,17 @@ export interface Trick {
   cards: PlayEntry[]
   winner: Seat
 }
+export type Side = 'north-south' | 'east-west'
+export type Scores = Record<Side, number>
+export interface BoardScore {
+  declarerSide: Side | null
+  declarerTricks: number
+  requiredTricks: number
+  vulnerable: boolean
+  items: { label: string; points: number }[]
+  declarerScore: number
+  delta: Scores
+}
 export interface BoardView {
   number: number
   dealer: Seat
@@ -64,6 +75,9 @@ export interface BoardView {
     | 'playing'
     | 'awaiting-score'
     | 'passed-out'
+    | 'scored'
+  score: BoardScore | null
+  reviewHands: Record<Seat, Card[]> | null
   dummy: { seat: Seat; hand: Card[] } | null
   currentTrick: PlayEntry[]
   tricks: Trick[]
@@ -83,6 +97,7 @@ export interface BoardView {
 export interface RoomState {
   code: string
   version: number
+  scores: Scores
   hostId: string
   selfId: string
   members: Member[]
