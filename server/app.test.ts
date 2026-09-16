@@ -184,6 +184,7 @@ test(
           'cardCount',
           'controller',
           'memberId',
+          'ready',
         ])
     }
     const stale = await submit({

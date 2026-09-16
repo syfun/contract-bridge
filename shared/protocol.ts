@@ -90,6 +90,7 @@ export interface BoardView {
     {
       memberId: string | null
       controller: 'human' | 'computer'
+      ready: boolean
       cardCount: number
     }
   >
@@ -115,6 +116,7 @@ export type Command = { credential: string; operationId: string } & (
       card: Card
     }
   | { kind: 'call'; code: string; expectedVersion: number; call: Call }
+  | { kind: 'ready'; code: string; expectedVersion: number }
   | { kind: 'start'; code: string; expectedVersion: number }
   | { kind: 'seat'; code: string; expectedVersion: number; seat: Seat }
 )

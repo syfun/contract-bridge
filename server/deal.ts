@@ -22,6 +22,7 @@ export interface StoredBoard {
   currentTrick?: BoardView['currentTrick']
   tricks?: BoardView['tricks']
   score?: BoardView['score']
+  ready?: Partial<Record<Seat, boolean>>
   hands: Record<Seat, Card[]>
 }
 
@@ -36,7 +37,18 @@ export function shuffledDeck(): Card[] {
   return deck
 }
 
-export function dealBoard(members: Member[], deck: Card[]): StoredBoard {
+const vulnerabilities: BoardView['vulnerability'][] = [
+  'none', 'north-south', 'east-west', 'both',
+  'north-south', 'east-west', 'both', 'none',
+  'east-west', 'both', 'none', 'north-south',
+  'both', 'none', 'north-south', 'east-west',
+]
+
+export function dealBoard(
+  members: Member[],
+  deck: Card[],
+  number = 1,
+): StoredBoard {
   if (
     deck.length !== 52 ||
     new Set(deck).size !== 52 ||
@@ -50,10 +62,10 @@ export function dealBoard(members: Member[], deck: Card[]): StoredBoard {
     occupants[seat] = members.find((member) => member.seat === seat)?.id ?? null
   }
   return {
-    number: 1,
-    dealer: 'north',
-    vulnerability: 'none',
-    turn: 'north',
+    number,
+    dealer: seats[(number - 1) % 4],
+    vulnerability: vulnerabilities[(number - 1) % 16],
+    turn: seats[(number - 1) % 4],
     phase: 'auction',
     auction: [],
     contract: null,
@@ -70,6 +82,9 @@ export function visibleBoard(
   const publicSeats = {} as BoardView['seats']
   for (const seat of seats) {
     publicSeats[seat] = {
+      ready: Boolean(
+        board.score && (board.occupants[seat] === null || board.ready?.[seat]),
+      ),
       memberId: board.occupants[seat],
       controller: board.occupants[seat] ? 'human' : 'computer',
       cardCount: board.hands[seat].length,

@@ -160,7 +160,7 @@ export class GameService {
     )
       return { status: 'illegal_action', message: '缺少有效身份或操作标识。' }
     if (
-      !['create', 'join', 'seat', 'start', 'call', 'play'].includes(
+      !['create', 'join', 'seat', 'start', 'call', 'play', 'ready'].includes(
         command.kind,
       )
     )
@@ -316,7 +316,21 @@ export class GameService {
             return reject('stale_state', '房间状态已更新，请重新操作。')
           const member = room.members.find((m) => m.id === memberId)
           if (!member) return reject('unauthorized', '你不属于这个房间。')
-          if (command.kind === 'play') {
+          if (command.kind === 'ready') {
+            const board = room.board
+            if (!board?.score)
+              return reject('illegal_action', '请在本副结算后准备。')
+            if (!member.seat || board.occupants[member.seat] !== memberId)
+              return reject('unauthorized', '你未参与本副，不能准备。')
+            board.ready ??= {}
+            board.ready[member.seat] = true
+            if (
+              seats.every(
+                (seat) => board.occupants[seat] === null || board.ready?.[seat],
+              )
+            )
+              room.board = dealBoard(room.members, this.deck(), board.number + 1)
+          } else if (command.kind === 'play') {
             if (
               !room.board ||
               !['opening-lead', 'playing'].includes(room.board.phase)

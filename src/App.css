@@ -616,3 +616,26 @@ button.playing-card.selected {
     grid-template-columns: 1fr;
   }
 }
+
+.ready-controls {
+  margin: 24px 0;
+  padding: 20px 0;
+  border-block: 1px solid #d7e2d8;
+}
+.ready-controls button {
+  width: 100%;
+}
+.ready-seats {
+  list-style: none;
+  padding: 0;
+}
+.ready-seats li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+.ready-seats strong {
+  flex-shrink: 0;
+  color: #355b42;
+}

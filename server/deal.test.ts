@@ -174,10 +174,10 @@ test('一名真人开局后空位由电脑补齐，只返回本人十三张牌',
     score: null,
     reviewHands: null,
     seats: {
-      north: { memberId: null, controller: 'computer', cardCount: 13 },
-      east: { memberId: null, controller: 'computer', cardCount: 13 },
-      south: { memberId: state.selfId, controller: 'human', cardCount: 13 },
-      west: { memberId: null, controller: 'computer', cardCount: 13 },
+      north: { memberId: null, controller: 'computer', cardCount: 13, ready: false },
+      east: { memberId: null, controller: 'computer', cardCount: 13, ready: false },
+      south: { memberId: state.selfId, controller: 'human', cardCount: 13, ready: false },
+      west: { memberId: null, controller: 'computer', cardCount: 13, ready: false },
     },
   })
   assert.equal(state.version, 3)

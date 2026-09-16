@@ -1,7 +1,7 @@
 import { ScoreTotals } from './ScorePanel.tsx'
 import { useEffect, useState } from 'react'
 import { io } from 'socket.io-client'
-import { seatNames } from '../shared/protocol.ts'
+import { seats, seatNames } from '../shared/protocol.ts'
 import type {
   Call,
   Card,
@@ -99,17 +99,19 @@ export default function App() {
         save({ credential: command.credential, code: result.state.code })
         update(result.state)
         setMessage(
-          command.kind === 'play'
-            ? '出牌已保存。'
-            : command.kind === 'call'
-              ? '叫牌已保存。'
-              : command.kind === 'seat'
-                ? '座位已保存。'
-                : command.kind === 'start'
-                  ? '本副已开始，手牌已保存。'
-                  : result.state.board
-                    ? '已加入，请等待下一副入座。'
-                    : '已进入房间，选一个座位吧。',
+          command.kind === 'ready'
+            ? '准备已保存；全部真人准备后自动开始下一副。'
+            : command.kind === 'play'
+              ? '出牌已保存。'
+              : command.kind === 'call'
+                ? '叫牌已保存。'
+                : command.kind === 'seat'
+                  ? '座位已保存。'
+                  : command.kind === 'start'
+                    ? '本副已开始，手牌已保存。'
+                    : result.state.board
+                      ? '已加入，请等待下一副入座。'
+                      : '已进入房间，选一个座位吧。',
         )
       } else {
         setMessage(result.message)
@@ -211,10 +213,10 @@ export default function App() {
         card,
       })
   }
-  function start() {
+  function advanceBoard(kind: 'start' | 'ready') {
     if (state && session)
       void send({
-        kind: 'start',
+        kind,
         code: state.code,
         credential: session.credential,
         operationId: operationId(),
@@ -366,6 +368,50 @@ export default function App() {
                   onCall={call}
                 />
               )}
+              {state.board?.score && (
+                <section className="ready-controls" aria-label="下一副准备">
+                  <h2>准备下一副</h2>
+                  <p className="muted">
+                    看完结算后再准备，全部真人准备后自动发牌。
+                  </p>
+                  <ul className="ready-seats">
+                    {seats.map((seat) => (
+                      <li key={seat}>
+                        <span>
+                          {seatNames[seat]}家 ·{' '}
+                          {state.board!.seats[seat].controller === 'computer'
+                            ? '电脑牌手'
+                            : state.members.find(
+                                (m) => m.id === state.board!.seats[seat].memberId,
+                              )?.nickname}
+                        </span>
+                        <strong>
+                          {state.board!.seats[seat].ready ? '已准备' : '未准备'}
+                        </strong>
+                      </li>
+                    ))}
+                  </ul>
+                  {self?.seat &&
+                  state.board.seats[self.seat].memberId === state.selfId ? (
+                    <button
+                      className="primary"
+                      disabled={
+                        busy ||
+                        !!session?.pending ||
+                        !connected ||
+                        state.board.seats[self.seat].ready
+                      }
+                      onClick={() => advanceBoard('ready')}
+                    >
+                      {state.board.seats[self.seat].ready
+                        ? '已准备，等待其他牌友'
+                        : '准备下一副'}
+                    </button>
+                  ) : (
+                    <p className="muted">你未参与本副，请等待入座。</p>
+                  )}
+                </section>
+              )}
               <h2>
                 本桌牌友 <small>{state.members.length} / 4</small>
               </h2>
@@ -403,7 +449,7 @@ export default function App() {
                           !connected ||
                           !self?.seat
                         }
-                        onClick={start}
+                        onClick={() => advanceBoard('start')}
                       >
                         开始第一副
                       </button>
