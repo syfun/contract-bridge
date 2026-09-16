@@ -38,7 +38,8 @@ type ComputerAuthority = {
   version: number
 }
 
-type StoredRoom = Omit<RoomState, 'selfId' | 'board' | 'hand' | 'scores'> & {
+type StoredRoom = Omit<RoomState, 'selfId' | 'board' | 'hand' | 'scores' | 'pause'> & {
+  pause?: RoomState['pause']
   scores?: RoomState['scores']
   board?: StoredBoard
 }
@@ -69,6 +70,7 @@ function visibleRoom(room: StoredRoom, selfId: string): RoomState {
     : { board: null, hand: [] }
   return {
     scores: { ...(room.scores ?? { 'north-south': 0, 'east-west': 0 }) },
+    pause: room.pause ?? null,
     code: room.code,
     version: room.version,
     hostId: room.hostId,
@@ -177,6 +179,7 @@ export class GameService {
     const room = this.room(code)
     const board = room?.board
     if (
+      room?.pause ||
       !board ||
       board.phase !== 'auction' ||
       !board.turn ||
@@ -206,7 +209,7 @@ export class GameService {
   computerPlayTurn(code: string): ComputerPlayTurn | null {
     const room = this.room(code)
     const board = room?.board
-    if (!board || !['opening-lead', 'playing'].includes(board.phase) || !board.turn || !board.contract || playController(board) !== null)
+    if (room?.pause || !board || !['opening-lead', 'playing'].includes(board.phase) || !board.turn || !board.contract || playController(board) !== null)
       return null
     const dummy = dummySeat(board)!
     const controller = board.turn === dummy ? board.contract.declarer : board.turn
@@ -285,7 +288,7 @@ export class GameService {
     )
       return { status: 'illegal_action', message: '缺少有效身份或操作标识。' }
     if (
-      !['create', 'join', 'seat', 'start', 'call', 'play', 'ready'].includes(
+      !['create', 'join', 'seat', 'start', 'call', 'play', 'ready', 'pause', 'resume'].includes(
         command.kind,
       )
     )
@@ -467,7 +470,17 @@ export class GameService {
             ? { id: '', nickname: '', joinedOrder: 0, seat: computer.seat }
             : room.members.find((m) => m.id === memberId)
           if (!member) return reject('unauthorized', '你不属于这个房间。')
-          if (command.kind === 'ready') {
+          if (room.pause && !['pause', 'resume', 'seat'].includes(command.kind))
+            return reject('paused', '牌桌已暂停，请等待房主恢复。')
+          if (command.kind === 'pause' || command.kind === 'resume') {
+            if (memberId !== room.hostId)
+              return reject('unauthorized', '只有房主可以暂停或恢复牌桌。')
+            if (!room.board)
+              return reject('illegal_action', '请先开始第一副。')
+            if (command.kind === 'pause' ? !!room.pause : !room.pause)
+              return reject('illegal_action', command.kind === 'pause' ? '牌桌已经暂停。' : '牌桌尚未暂停。')
+            room.pause = command.kind === 'pause' ? { reason: 'host' } : null
+          } else if (command.kind === 'ready') {
             const board = room.board
             if (!board?.score)
               return reject('illegal_action', '请在本副结算后准备。')

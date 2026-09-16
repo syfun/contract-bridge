@@ -100,19 +100,23 @@ export default function App() {
         save({ credential: command.credential, code: result.state.code })
         update(result.state)
         setMessage(
-          command.kind === 'ready'
-            ? '准备已保存；全部真人准备后自动开始下一副。'
-            : command.kind === 'play'
-              ? '出牌已保存。'
-              : command.kind === 'call'
-                ? '叫牌已保存。'
-                : command.kind === 'seat'
-                  ? '座位已保存。'
-                  : command.kind === 'start'
-                    ? '本副已开始，手牌已保存。'
-                    : result.state.board
-                      ? '已加入，请等待下一副入座。'
-                      : '已进入房间，选一个座位吧。',
+          command.kind === 'pause'
+            ? '牌桌已暂停，进度已保存。'
+            : command.kind === 'resume'
+              ? '牌桌已恢复，从原位置继续。'
+              : command.kind === 'ready'
+                ? '准备已保存；全部真人准备后自动开始下一副。'
+                : command.kind === 'play'
+                  ? '出牌已保存。'
+                  : command.kind === 'call'
+                    ? '叫牌已保存。'
+                    : command.kind === 'seat'
+                      ? '座位已保存。'
+                      : command.kind === 'start'
+                        ? '本副已开始，手牌已保存。'
+                        : result.state.board
+                          ? '已加入，请等待下一副入座。'
+                          : '已进入房间，选一个座位吧。',
         )
       } else {
         setMessage(result.message)
@@ -214,7 +218,7 @@ export default function App() {
         card,
       })
   }
-  function advanceBoard(kind: 'start' | 'ready') {
+  function advanceBoard(kind: 'start' | 'ready' | 'pause' | 'resume') {
     if (state && session)
       void send({
         kind,
@@ -244,9 +248,11 @@ export default function App() {
         {message ||
           (restoring
             ? '正在恢复你的房间和座位…'
-            : state?.board
-              ? '牌局已恢复。请查看当前行动方与公开叫牌记录。'
-              : '南北搭档，东西搭档。选好座位，等朋友到齐。')}
+            : state?.pause
+              ? '牌桌仍处于暂停状态，等待房主恢复。'
+              : state?.board
+                ? '请查看当前行动方与公开叫牌记录。'
+                : '南北搭档，东西搭档。选好座位，等朋友到齐。')}
         {session?.pending && (
           <button disabled={busy} onClick={() => void send(session.pending!)}>
             重试操作
@@ -353,10 +359,29 @@ export default function App() {
               </small>
             </p>
           </section>
+          {state.board && (
+            <section className={`pause-controls${state.pause ? ' is-paused' : ''}`} aria-label="牌桌暂停与恢复">
+              <div role="status">
+                <strong>{state.pause ? '牌桌已暂停 · 房主暂停' : '牌桌进行中'}</strong>
+                <p>{state.pause
+                  ? '进度已保存，叫牌、出牌和下一副准备已停用。等待房主恢复后继续。'
+                  : '正常轮次不限时，可由房主暂停整桌。'}</p>
+              </div>
+              {state.hostId === state.selfId ? (
+                <button
+                  className="primary"
+                  disabled={busy || !!session?.pending || !connected}
+                  onClick={() => advanceBoard(state.pause ? 'resume' : 'pause')}
+                >
+                  {state.pause ? '恢复牌桌' : '暂停牌桌'}
+                </button>
+              ) : <span className="muted">仅房主可暂停或恢复</span>}
+            </section>
+          )}
           <div className="room-layout">
             <PlayTable
               state={state}
-              locked={busy || !!session?.pending || !connected}
+              locked={busy || !!session?.pending || !connected || !!state.pause}
               onChoose={choose}
               onPlay={play}
             />
@@ -366,7 +391,7 @@ export default function App() {
               {state.board && (
                 <AuctionPanel
                   board={state.board}
-                  locked={busy || !!session?.pending || !connected}
+                  locked={busy || !!session?.pending || !connected || !!state.pause}
                   onCall={call}
                 />
               )}
@@ -402,6 +427,7 @@ export default function App() {
                         busy ||
                         !!session?.pending ||
                         !connected ||
+                        !!state.pause ||
                         state.board.seats[self.seat].ready
                       }
                       onClick={() => advanceBoard('ready')}

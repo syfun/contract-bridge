@@ -158,6 +158,7 @@ test(
         'hand',
         'hostId',
         'members',
+        'pause',
         'scores',
         'selfId',
         'version',

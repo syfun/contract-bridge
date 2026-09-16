@@ -685,3 +685,28 @@ button.playing-card.selected {
   cursor: pointer;
   padding: 12px 0;
 }
+
+.pause-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  border: 1px solid #c9d8c8;
+  border-radius: 16px;
+  background: #edf3e9;
+}
+.pause-controls.is-paused {
+  border-color: #b5a775;
+  background: #f4f0df;
+}
+.pause-controls p {
+  margin: 8px 0 0;
+  line-height: 1.6;
+}
+.pause-controls button {
+  min-height: 44px;
+  flex-shrink: 0;
+}

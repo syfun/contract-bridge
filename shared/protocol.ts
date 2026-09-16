@@ -96,6 +96,7 @@ export interface BoardView {
   >
 }
 export interface RoomState {
+  pause: { reason: 'host' } | null
   code: string
   version: number
   scores: Scores
@@ -116,11 +117,14 @@ export type Command = { credential: string; operationId: string } & (
       card: Card
     }
   | { kind: 'call'; code: string; expectedVersion: number; call: Call }
+  | { kind: 'pause'; code: string; expectedVersion: number }
+  | { kind: 'resume'; code: string; expectedVersion: number }
   | { kind: 'ready'; code: string; expectedVersion: number }
   | { kind: 'start'; code: string; expectedVersion: number }
   | { kind: 'seat'; code: string; expectedVersion: number; seat: Seat }
 )
 export type ErrorCode =
+  | 'paused'
   | 'illegal_action'
   | 'unauthorized'
   | 'stale_state'

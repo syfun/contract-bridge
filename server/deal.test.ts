@@ -199,6 +199,7 @@ test('开局后座位锁定，等待者和中途加入者不能领取电脑手�
       'hand',
       'hostId',
       'members',
+      'pause',
       'scores',
       'selfId',
       'version',
