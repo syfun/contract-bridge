@@ -1,5 +1,7 @@
+import { playRules } from '../shared/computer-play.ts'
+import type { PlayInput, PlayDecision } from '../shared/computer-play.ts'
 import { scoreContract, sideOf } from './scoring.ts'
-import { applyPlay, playController } from './play.ts'
+import { dummySeat, legalCards, applyPlay, playController } from './play.ts'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import type {
@@ -24,7 +26,13 @@ export interface ComputerTurn {
   code: string
   input: AuctionInput
 }
+export interface ComputerPlayTurn {
+  code: string
+  input: PlayInput
+}
 type ComputerAuthority = {
+  kind: 'call' | 'play'
+  handSeat?: PlayInput['turn']
   code: string
   seat: AuctionInput['seat']
   version: number
@@ -73,7 +81,7 @@ const digest = (value: string) =>
   createHash('sha256').update(value).digest('hex')
 
 export class GameService {
-  private computerTurns = new WeakMap<ComputerTurn, ComputerAuthority>()
+  private computerTurns = new WeakMap<ComputerTurn | ComputerPlayTurn, ComputerAuthority>()
   private db: DatabaseSync
   private deck: () => Card[]
   constructor(path: string, options: { deck?: () => Card[] } = {}) {
@@ -188,15 +196,50 @@ export class GameService {
       },
     }
     this.computerTurns.set(turn, {
+      kind: 'call',
       code,
       seat: board.turn,
       version: room!.version,
     })
     return turn
   }
+  computerPlayTurn(code: string): ComputerPlayTurn | null {
+    const room = this.room(code)
+    const board = room?.board
+    if (!board || !['opening-lead', 'playing'].includes(board.phase) || !board.turn || !board.contract || playController(board) !== null)
+      return null
+    const dummy = dummySeat(board)!
+    const controller = board.turn === dummy ? board.contract.declarer : board.turn
+    const turn: ComputerPlayTurn = {
+      code,
+      input: {
+        version: room!.version,
+        seat: controller,
+        turn: board.turn,
+        hand: [...board.hands[controller]],
+        dummy: board.phase === 'playing' ? { seat: dummy, hand: [...board.hands[dummy]] } : null,
+        contract: { ...board.contract },
+        vulnerability: board.vulnerability,
+        auction: structuredClone(board.auction),
+        currentTrick: structuredClone(board.currentTrick ?? []),
+        tricks: structuredClone(board.tricks ?? []),
+        legalCards: legalCards(board),
+      },
+    }
+    this.computerTurns.set(turn, { kind: 'play', code, seat: controller, handSeat: board.turn, version: room!.version })
+    return turn
+  }
+  submitComputerPlay(turn: ComputerPlayTurn, decision: PlayDecision): Result {
+    const authority = this.computerTurns.get(turn)
+    if (!authority || authority.kind !== 'play')
+      return { status: 'unauthorized', message: '无效的电脑行动授权。' }
+    if (!decision || decision.version !== authority.version || decision.conventionVersion !== conventionVersion || !playRules.includes(decision.rule) || typeof decision.reason !== 'string' || decision.reason.length > 2048)
+      return { status: 'illegal_action', message: '电脑建议格式或输入版本无效。' }
+    return this.executeCommand({ kind: 'play', code: authority.code, credential: '', operationId: `computer-${authority.version}-${authority.seat}`, expectedVersion: authority.version, seat: decision.seat, card: decision.card }, authority, decision)
+  }
   submitComputerCall(turn: ComputerTurn, decision: AuctionDecision): Result {
     const authority = this.computerTurns.get(turn)
-    if (!authority)
+    if (!authority || authority.kind !== 'call')
       return { status: 'unauthorized', message: '无效的电脑行动授权。' }
     if (
       !decision ||
@@ -229,7 +272,7 @@ export class GameService {
   private executeCommand(
     input: unknown,
     computer?: ComputerAuthority,
-    decision?: AuctionDecision,
+    decision?: AuctionDecision | PlayDecision,
   ): Result {
     if (!input || typeof input !== 'object')
       return { status: 'illegal_action', message: '操作格式不正确。' }
@@ -410,10 +453,14 @@ export class GameService {
             return reject('stale_state', '房间状态已更新，请重新操作。')
           if (
             computer &&
-            (command.kind !== 'call' ||
-              room.board?.phase !== 'auction' ||
-              room.board.turn !== computer.seat ||
-              room.board.occupants[computer.seat] !== null)
+            (command.kind !== computer.kind ||
+              !room.board ||
+              room.board.occupants[computer.seat] !== null ||
+              (computer.kind === 'call'
+                ? room.board.phase !== 'auction' || room.board.turn !== computer.seat
+                : !['opening-lead', 'playing'].includes(room.board.phase) ||
+                  room.board.turn !== computer.handSeat ||
+                  (room.board.turn === dummySeat(room.board) ? room.board.contract?.declarer : room.board.turn) !== computer.seat))
           )
             return reject('unauthorized', '电脑已失去该座位的行动权。')
           const member = computer
@@ -444,7 +491,7 @@ export class GameService {
               !['opening-lead', 'playing'].includes(room.board.phase)
             )
               return reject('illegal_action', '当前不在出牌阶段。')
-            if (playController(room.board, command.seat) !== memberId)
+            if (computer ? command.seat !== computer.handSeat || playController(room.board, command.seat) !== null : playController(room.board, command.seat) !== memberId)
               return reject('unauthorized', '你无权操作这手牌。')
             if (!applyPlay(room.board, command.seat, command.card))
               return reject(

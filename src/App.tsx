@@ -470,7 +470,7 @@ export default function App() {
               <p className="room-note">
                 同一浏览器刷新后会恢复身份和座位。
                 <br />
-                电脑自动叫牌；自动出牌将在后续版本提供。
+                空位由电脑牌手自动叫牌、出牌；本副结束后请准备下一副。
               </p>
             </aside>
           </div>

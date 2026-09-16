@@ -205,10 +205,10 @@ test('取得输入后控制权变化，即使存档版本未改变也拒绝旧�
 })
 
 test('真实 Worker 自动叫牌至真人行动，计算期间的新版本重新取输入', async (t) => {
-  const { ComputerAuctionRunner } = await import('./computer/runner.ts')
+  const { ComputerRunner } = await import('./computer/runner.ts')
   const room = table(t)
   const updates: number[] = []
-  const runner = new ComputerAuctionRunner(room.service, (code) => {
+  const runner = new ComputerRunner(room.service, (code) => {
     assert.equal(code, room.code)
     updates.push(room.read().version)
   })

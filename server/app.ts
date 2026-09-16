@@ -2,7 +2,7 @@ import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import { Server } from 'socket.io'
 import { resolve } from 'node:path'
-import { ComputerAuctionRunner } from './computer/runner.ts'
+import { ComputerRunner } from './computer/runner.ts'
 import { GameService } from './game-service.ts'
 
 export async function createApp(databasePath: string) {
@@ -19,7 +19,7 @@ export async function createApp(databasePath: string) {
       }
     }
   }
-  const computer = new ComputerAuctionRunner(service, broadcast)
+  const computer = new ComputerRunner(service, broadcast)
   await app.register(fastifyStatic, { root: resolve('dist') })
   app.post('/api/identity', (_request, reply) => {
     reply.header('Cache-Control', 'no-store')

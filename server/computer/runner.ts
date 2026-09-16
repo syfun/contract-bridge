@@ -1,3 +1,4 @@
+import type { PlayInput, PlayDecision } from '../../shared/computer-play.ts'
 import { Worker } from 'node:worker_threads'
 import type {
   AuctionDecision,
@@ -6,7 +7,7 @@ import type {
 import type { GameService } from '../game-service.ts'
 
 // 一个独立计算线程服务各桌，每桌最多一个未完成计算；不传存档或身份凭据。
-export class ComputerAuctionRunner {
+export class ComputerRunner {
   private service: GameService
   private broadcast: (code: string) => void
   private worker?: Worker
@@ -15,7 +16,7 @@ export class ComputerAuctionRunner {
   private pending = new Map<
     number,
     {
-      resolve: (value: AuctionDecision | null) => void
+      resolve: (value: AuctionDecision | PlayDecision | null) => void
       reject: (error: Error) => void
     }
   >()
@@ -25,9 +26,9 @@ export class ComputerAuctionRunner {
     this.service = service
     this.broadcast = broadcast
   }
-  private compute(input: AuctionInput): Promise<AuctionDecision | null> {
+  private compute(input: AuctionInput | PlayInput): Promise<AuctionDecision | PlayDecision | null> {
     if (!this.worker) {
-      const worker = new Worker(new URL('./auction-worker.ts', import.meta.url))
+      const worker = new Worker(new URL('./decision-worker.ts', import.meta.url))
       this.worker = worker
       worker.on('message', ({ id, decision }) => {
         this.pending.get(id)?.resolve(decision)
@@ -74,14 +75,20 @@ export class ComputerAuctionRunner {
   }
   private async run(code: string) {
     while (!this.closed) {
-      const turn = this.service.computerTurn(code)
-      if (!turn) return
-      const decision = await this.compute(turn.input)
+      const auction = this.service.computerTurn(code)
+      const play = auction ? null : this.service.computerPlayTurn(code)
+      if (!auction && !play) return
+      const decision = await this.compute((auction ?? play)!.input)
       if (this.closed || !decision) return
-      const result = this.service.submitComputerCall(turn, decision)
+      const result = auction && 'call' in decision
+        ? this.service.submitComputerCall(auction, decision)
+        : play && 'card' in decision
+          ? this.service.submitComputerPlay(play, decision)
+          : null
+      if (!result) return
       if (result.status === 'accepted') this.broadcast(code)
       else if (result.status === 'storage_failure')
-        throw Error('电脑叫牌保存失败')
+        throw Error('电脑行动保存失败')
       else if (
         result.status !== 'stale_state' &&
         result.status !== 'unauthorized'

@@ -1,0 +1,1460 @@
+{
+  "conventionVersion": "computer-conventions-v1.0",
+  "strategyRandomness": "确定性，不使用随机源",
+  "checks": [
+    {
+      "id": "P01",
+      "deal": "D1",
+      "input": {
+        "version": 7,
+        "seat": "west",
+        "turn": "west",
+        "hand": [
+          "S5",
+          "S4",
+          "S3",
+          "S2",
+          "H4",
+          "H3",
+          "H2",
+          "D6",
+          "D5",
+          "D4",
+          "CQ",
+          "CJ",
+          "C10"
+        ],
+        "dummy": null,
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [],
+        "tricks": [],
+        "legalCards": [
+          "S5",
+          "S4",
+          "S3",
+          "S2",
+          "H4",
+          "H3",
+          "H2",
+          "D6",
+          "D5",
+          "D4",
+          "CQ",
+          "CJ",
+          "C10"
+        ]
+      },
+      "decision": {
+        "seat": "west",
+        "card": "CQ",
+        "rule": "lead-sequence",
+        "reason": "从至少三张大牌连张的顶张首引。",
+        "version": 7,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    },
+    {
+      "id": "P02",
+      "deal": "D1",
+      "input": {
+        "version": 8,
+        "seat": "south",
+        "turn": "north",
+        "hand": [
+          "SA",
+          "S7",
+          "S6",
+          "HA",
+          "HK",
+          "HQ",
+          "D10",
+          "D9",
+          "D8",
+          "D7",
+          "CA",
+          "CK",
+          "C2"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "SK",
+            "SQ",
+            "SJ",
+            "H7",
+            "H6",
+            "H5",
+            "DA",
+            "D3",
+            "D2",
+            "C6",
+            "C5",
+            "C4",
+            "C3"
+          ]
+        },
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [
+          {
+            "seat": "west",
+            "card": "D4"
+          }
+        ],
+        "tricks": [],
+        "legalCards": [
+          "DA",
+          "D3",
+          "D2"
+        ]
+      },
+      "decision": {
+        "seat": "north",
+        "card": "D2",
+        "rule": "play-low",
+        "reason": "从合法牌中保守选择小牌。",
+        "version": 8,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    },
+    {
+      "id": "P03",
+      "deal": "D1",
+      "input": {
+        "version": 9,
+        "seat": "east",
+        "turn": "east",
+        "hand": [
+          "S10",
+          "S9",
+          "S8",
+          "HJ",
+          "H10",
+          "H9",
+          "H8",
+          "DK",
+          "DQ",
+          "DJ",
+          "C9",
+          "C8",
+          "C7"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "SK",
+            "SQ",
+            "SJ",
+            "H7",
+            "H6",
+            "H5",
+            "DA",
+            "D3",
+            "C6",
+            "C5",
+            "C4",
+            "C3"
+          ]
+        },
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [
+          {
+            "seat": "west",
+            "card": "D4"
+          },
+          {
+            "seat": "north",
+            "card": "D2"
+          }
+        ],
+        "tricks": [],
+        "legalCards": [
+          "DK",
+          "DQ",
+          "DJ"
+        ]
+      },
+      "decision": {
+        "seat": "east",
+        "card": "DJ",
+        "rule": "win-cheap",
+        "reason": "使用能超过当前最大牌的最低合法牌争墩。",
+        "version": 9,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    },
+    {
+      "id": "P04",
+      "deal": "D5",
+      "input": {
+        "version": 14,
+        "seat": "east",
+        "turn": "east",
+        "hand": [
+          "S10",
+          "S9",
+          "S8",
+          "HJ",
+          "H10",
+          "H9",
+          "DK",
+          "DQ",
+          "DJ",
+          "CA",
+          "C8",
+          "C7"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "SK",
+            "SQ",
+            "SJ",
+            "H7",
+            "H6",
+            "DA",
+            "D3",
+            "D2",
+            "C6",
+            "C5",
+            "C4"
+          ]
+        },
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [
+          {
+            "seat": "south",
+            "card": "C2"
+          },
+          {
+            "seat": "west",
+            "card": "CQ"
+          },
+          {
+            "seat": "north",
+            "card": "C3"
+          }
+        ],
+        "tricks": [
+          {
+            "cards": [
+              {
+                "seat": "west",
+                "card": "H2"
+              },
+              {
+                "seat": "north",
+                "card": "H5"
+              },
+              {
+                "seat": "east",
+                "card": "H8"
+              },
+              {
+                "seat": "south",
+                "card": "HQ"
+              }
+            ],
+            "winner": "south"
+          }
+        ],
+        "legalCards": [
+          "CA",
+          "C8",
+          "C7"
+        ]
+      },
+      "decision": {
+        "seat": "east",
+        "card": "C7",
+        "rule": "keep-partner",
+        "reason": "第四家保留搭档已经取得的赢墩。",
+        "version": 14,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    },
+    {
+      "id": "P05",
+      "deal": "D1",
+      "input": {
+        "version": 10,
+        "seat": "south",
+        "turn": "south",
+        "hand": [
+          "SA",
+          "S7",
+          "S6",
+          "HA",
+          "HK",
+          "HQ",
+          "D10",
+          "D9",
+          "D8",
+          "D7",
+          "CA",
+          "CK",
+          "C2"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "SK",
+            "SQ",
+            "SJ",
+            "H7",
+            "H6",
+            "H5",
+            "DA",
+            "D3",
+            "D2",
+            "C6",
+            "C5",
+            "C4"
+          ]
+        },
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [
+          {
+            "seat": "west",
+            "card": "CQ"
+          },
+          {
+            "seat": "north",
+            "card": "C3"
+          },
+          {
+            "seat": "east",
+            "card": "C7"
+          }
+        ],
+        "tricks": [],
+        "legalCards": [
+          "CA",
+          "CK",
+          "C2"
+        ]
+      },
+      "decision": {
+        "seat": "south",
+        "card": "CK",
+        "rule": "win-cheap",
+        "reason": "使用能超过当前最大牌的最低合法牌争墩。",
+        "version": 10,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    },
+    {
+      "id": "P06",
+      "deal": "D2",
+      "input": {
+        "version": 11,
+        "seat": "south",
+        "turn": "north",
+        "hand": [
+          "SA",
+          "SK",
+          "SQ",
+          "SJ",
+          "HK",
+          "HQ",
+          "DA",
+          "D10",
+          "D9",
+          "CA",
+          "CK",
+          "C2"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "S10",
+            "S9",
+            "S8",
+            "HA",
+            "H3",
+            "H2",
+            "DK",
+            "DQ",
+            "C7",
+            "C6",
+            "C5",
+            "C4"
+          ]
+        },
+        "contract": {
+          "level": 4,
+          "denomination": "S",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 4,
+              "denomination": "S"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [],
+        "tricks": [
+          {
+            "cards": [
+              {
+                "seat": "west",
+                "card": "D2"
+              },
+              {
+                "seat": "north",
+                "card": "DJ"
+              },
+              {
+                "seat": "east",
+                "card": "D5"
+              },
+              {
+                "seat": "south",
+                "card": "D8"
+              }
+            ],
+            "winner": "north"
+          }
+        ],
+        "legalCards": [
+          "S10",
+          "S9",
+          "S8",
+          "HA",
+          "H3",
+          "H2",
+          "DK",
+          "DQ",
+          "C7",
+          "C6",
+          "C5",
+          "C4"
+        ]
+      },
+      "decision": {
+        "seat": "north",
+        "card": "S8",
+        "rule": "draw-trump",
+        "reason": "两手可见强将配合且没有短将手的将吃机会，先吊将。",
+        "version": 11,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    },
+    {
+      "id": "P07",
+      "deal": "D3",
+      "input": {
+        "version": 13,
+        "seat": "south",
+        "turn": "north",
+        "hand": [
+          "S7",
+          "S6",
+          "HA",
+          "HK",
+          "HQ",
+          "D10",
+          "D9",
+          "D8",
+          "D7",
+          "CA",
+          "C2"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "SA",
+            "SQ",
+            "SJ",
+            "H7",
+            "H6",
+            "H5",
+            "DA",
+            "D3",
+            "D2",
+            "C6",
+            "C5",
+            "C4"
+          ]
+        },
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [
+          {
+            "seat": "south",
+            "card": "S5"
+          },
+          {
+            "seat": "west",
+            "card": "S2"
+          }
+        ],
+        "tricks": [
+          {
+            "cards": [
+              {
+                "seat": "west",
+                "card": "CQ"
+              },
+              {
+                "seat": "north",
+                "card": "C3"
+              },
+              {
+                "seat": "east",
+                "card": "C7"
+              },
+              {
+                "seat": "south",
+                "card": "CK"
+              }
+            ],
+            "winner": "south"
+          }
+        ],
+        "legalCards": [
+          "SA",
+          "SQ",
+          "SJ"
+        ]
+      },
+      "decision": {
+        "seat": "north",
+        "card": "SJ",
+        "rule": "win-cheap",
+        "reason": "使用能超过当前最大牌的最低合法牌争墩。",
+        "version": 13,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    },
+    {
+      "id": "P08",
+      "deal": "D4",
+      "input": {
+        "version": 21,
+        "seat": "south",
+        "turn": "south",
+        "hand": [
+          "SA",
+          "SK",
+          "SQ",
+          "SJ",
+          "S10",
+          "HK",
+          "HQ",
+          "DA",
+          "D10",
+          "D9"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "S9",
+            "S8",
+            "HA",
+            "H3",
+            "H2",
+            "DK",
+            "DQ",
+            "C7",
+            "C6"
+          ]
+        },
+        "contract": {
+          "level": 4,
+          "denomination": "S",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 4,
+              "denomination": "S"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [
+          {
+            "seat": "north",
+            "card": "C5"
+          },
+          {
+            "seat": "east",
+            "card": "C10"
+          }
+        ],
+        "tricks": [
+          {
+            "cards": [
+              {
+                "seat": "west",
+                "card": "C2"
+              },
+              {
+                "seat": "north",
+                "card": "C3"
+              },
+              {
+                "seat": "east",
+                "card": "CQ"
+              },
+              {
+                "seat": "south",
+                "card": "CK"
+              }
+            ],
+            "winner": "south"
+          },
+          {
+            "cards": [
+              {
+                "seat": "south",
+                "card": "CA"
+              },
+              {
+                "seat": "west",
+                "card": "C8"
+              },
+              {
+                "seat": "north",
+                "card": "C4"
+              },
+              {
+                "seat": "east",
+                "card": "CJ"
+              }
+            ],
+            "winner": "south"
+          },
+          {
+            "cards": [
+              {
+                "seat": "south",
+                "card": "D8"
+              },
+              {
+                "seat": "west",
+                "card": "D2"
+              },
+              {
+                "seat": "north",
+                "card": "DJ"
+              },
+              {
+                "seat": "east",
+                "card": "D5"
+              }
+            ],
+            "winner": "north"
+          }
+        ],
+        "legalCards": [
+          "SA",
+          "SK",
+          "SQ",
+          "SJ",
+          "S10",
+          "HK",
+          "HQ",
+          "DA",
+          "D10",
+          "D9"
+        ]
+      },
+      "decision": {
+        "seat": "south",
+        "card": "S10",
+        "rule": "win-cheap",
+        "reason": "使用能超过当前最大牌的最低合法牌争墩。",
+        "version": 21,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    },
+    {
+      "id": "P09",
+      "input": {
+        "version": 10,
+        "seat": "south",
+        "turn": "south",
+        "hand": [
+          "SA",
+          "S7",
+          "S6",
+          "HA",
+          "HK",
+          "HQ",
+          "D10",
+          "D9",
+          "D8",
+          "D7",
+          "CA",
+          "CK",
+          "C2"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "SK",
+            "SQ",
+            "SJ",
+            "H7",
+            "H6",
+            "H5",
+            "DA",
+            "D3",
+            "C6",
+            "C5",
+            "C4",
+            "C3"
+          ]
+        },
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [
+          {
+            "seat": "west",
+            "card": "D4"
+          },
+          {
+            "seat": "north",
+            "card": "D2"
+          },
+          {
+            "seat": "east",
+            "card": "DJ"
+          }
+        ],
+        "tricks": [],
+        "legalCards": [
+          "D10",
+          "D9",
+          "D8",
+          "D7"
+        ]
+      },
+      "decision": {
+        "seat": "south",
+        "card": "D7",
+        "rule": "play-low",
+        "reason": "从合法牌中保守选择小牌。",
+        "version": 10,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "非法跟牌拒绝且状态不变；合法牌接受"
+    },
+    {
+      "id": "P10",
+      "input": {
+        "version": 11,
+        "seat": "south",
+        "turn": "north",
+        "hand": [
+          "SA",
+          "SK",
+          "SQ",
+          "SJ",
+          "HK",
+          "HQ",
+          "DA",
+          "D10",
+          "D9",
+          "CA",
+          "CK",
+          "C2"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "S10",
+            "S9",
+            "S8",
+            "HA",
+            "H3",
+            "H2",
+            "DK",
+            "DQ",
+            "C7",
+            "C6",
+            "C5",
+            "C4"
+          ]
+        },
+        "contract": {
+          "level": 4,
+          "denomination": "S",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 4,
+              "denomination": "S"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [],
+        "tricks": [
+          {
+            "cards": [
+              {
+                "seat": "west",
+                "card": "D2"
+              },
+              {
+                "seat": "north",
+                "card": "DJ"
+              },
+              {
+                "seat": "east",
+                "card": "D5"
+              },
+              {
+                "seat": "south",
+                "card": "D8"
+              }
+            ],
+            "winner": "north"
+          }
+        ],
+        "legalCards": [
+          "S10",
+          "S9",
+          "S8",
+          "HA",
+          "H3",
+          "H2",
+          "DK",
+          "DQ",
+          "C7",
+          "C6",
+          "C5",
+          "C4"
+        ]
+      },
+      "decision": {
+        "seat": "north",
+        "card": "S8",
+        "rule": "draw-trump",
+        "reason": "两手可见强将配合且没有短将手的将吃机会，先吊将。",
+        "version": 11,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "明手越权拒绝；庄家控制明手接受；下一家东"
+    },
+    {
+      "id": "P11",
+      "input": {
+        "version": 13,
+        "seat": "south",
+        "turn": "north",
+        "hand": [
+          "S7",
+          "S6",
+          "HA",
+          "HK",
+          "HQ",
+          "D10",
+          "D9",
+          "D8",
+          "D7",
+          "CA",
+          "C2"
+        ],
+        "dummy": {
+          "seat": "north",
+          "hand": [
+            "SA",
+            "SQ",
+            "SJ",
+            "H7",
+            "H6",
+            "H5",
+            "DA",
+            "D3",
+            "D2",
+            "C6",
+            "C5",
+            "C4"
+          ]
+        },
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [
+          {
+            "seat": "south",
+            "card": "S5"
+          },
+          {
+            "seat": "west",
+            "card": "S2"
+          }
+        ],
+        "tricks": [
+          {
+            "cards": [
+              {
+                "seat": "west",
+                "card": "CQ"
+              },
+              {
+                "seat": "north",
+                "card": "C3"
+              },
+              {
+                "seat": "east",
+                "card": "C7"
+              },
+              {
+                "seat": "south",
+                "card": "CK"
+              }
+            ],
+            "winner": "south"
+          }
+        ],
+        "legalCards": [
+          "SA",
+          "SQ",
+          "SJ"
+        ]
+      },
+      "decision": {
+        "seat": "north",
+        "card": "SJ",
+        "rule": "win-cheap",
+        "reason": "使用能超过当前最大牌的最低合法牌争墩。",
+        "version": 13,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20 输入与结果相同"
+    },
+    {
+      "id": "P12",
+      "input": {
+        "version": 7,
+        "seat": "west",
+        "turn": "west",
+        "hand": [
+          "S5",
+          "S4",
+          "S3",
+          "S2",
+          "H4",
+          "H3",
+          "H2",
+          "D6",
+          "D5",
+          "D4",
+          "CQ",
+          "CJ",
+          "C10"
+        ],
+        "dummy": null,
+        "contract": {
+          "level": 3,
+          "denomination": "NT",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 3,
+              "denomination": "NT"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [],
+        "tricks": [],
+        "legalCards": [
+          "S5",
+          "S4",
+          "S3",
+          "S2",
+          "H4",
+          "H3",
+          "H2",
+          "D6",
+          "D5",
+          "D4",
+          "CQ",
+          "CJ",
+          "C10"
+        ]
+      },
+      "decision": {
+        "seat": "west",
+        "card": "CQ",
+        "rule": "lead-sequence",
+        "reason": "从至少三张大牌连张的顶张首引。",
+        "version": 7,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20 输入与结果相同"
+    },
+    {
+      "id": "P13",
+      "deal": "D6",
+      "input": {
+        "version": 7,
+        "seat": "west",
+        "turn": "west",
+        "hand": [
+          "S4",
+          "S3",
+          "S2",
+          "H7",
+          "H6",
+          "H5",
+          "H4",
+          "D2",
+          "C9",
+          "C8",
+          "C5",
+          "C4",
+          "C3"
+        ],
+        "dummy": null,
+        "contract": {
+          "level": 4,
+          "denomination": "S",
+          "doubling": "undoubled",
+          "declarer": "south",
+          "openingLeader": "west"
+        },
+        "vulnerability": "none",
+        "auction": [
+          {
+            "seat": "south",
+            "call": {
+              "kind": "bid",
+              "level": 4,
+              "denomination": "S"
+            }
+          },
+          {
+            "seat": "west",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "north",
+            "call": {
+              "kind": "pass"
+            }
+          },
+          {
+            "seat": "east",
+            "call": {
+              "kind": "pass"
+            }
+          }
+        ],
+        "currentTrick": [],
+        "tricks": [],
+        "legalCards": [
+          "S4",
+          "S3",
+          "S2",
+          "H7",
+          "H6",
+          "H5",
+          "H4",
+          "D2",
+          "C9",
+          "C8",
+          "C5",
+          "C4",
+          "C3"
+        ]
+      },
+      "decision": {
+        "seat": "west",
+        "card": "D2",
+        "rule": "lead-singleton",
+        "reason": "有将首攻非将单张，争取后续将吃。",
+        "version": 7,
+        "conventionVersion": "computer-conventions-v1.0"
+      },
+      "result": "20/20"
+    }
+  ]
+}
