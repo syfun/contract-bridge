@@ -29,12 +29,31 @@ export const ranks = [
   'A',
 ] as const
 export type Card = `${(typeof suits)[number]}${(typeof ranks)[number]}`
+export const denominations = ['C', 'D', 'H', 'S', 'NT'] as const
+export type Denomination = (typeof denominations)[number]
+export type Call =
+  | { kind: 'pass' | 'double' | 'redouble' }
+  | { kind: 'bid'; level: number; denomination: Denomination }
+export interface AuctionEntry {
+  seat: Seat
+  call: Call
+}
+export interface Contract {
+  level: number
+  denomination: Denomination
+  doubling: 'undoubled' | 'doubled' | 'redoubled'
+  declarer: Seat
+  openingLeader: Seat
+}
 export interface BoardView {
   number: number
   dealer: Seat
   vulnerability: 'none' | 'north-south' | 'east-west' | 'both'
-  turn: Seat
-  phase: 'auction'
+  turn: Seat | null
+  phase: 'auction' | 'opening-lead' | 'passed-out'
+  auction: AuctionEntry[]
+  contract: Contract | null
+  legalCalls: Call[]
   seats: Record<
     Seat,
     {
@@ -56,6 +75,7 @@ export interface RoomState {
 export type Command = { credential: string; operationId: string } & (
   | { kind: 'create'; nickname: string }
   | { kind: 'join'; nickname: string; code: string; expectedVersion: number }
+  | { kind: 'call'; code: string; expectedVersion: number; call: Call }
   | { kind: 'start'; code: string; expectedVersion: number }
   | { kind: 'seat'; code: string; expectedVersion: number; seat: Seat }
 )

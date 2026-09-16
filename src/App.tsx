@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { io } from 'socket.io-client'
 import { seatNames } from '../shared/protocol.ts'
 import type {
+  Call,
   Command,
   JoinVersion,
   Result,
@@ -9,6 +10,7 @@ import type {
   Seat,
 } from '../shared/protocol.ts'
 import './App.css'
+import { AuctionPanel } from './AuctionPanel.tsx'
 import { PlayTable } from './PlayTable.tsx'
 
 type Session = { credential: string; code?: string; pending?: Command }
@@ -95,13 +97,15 @@ export default function App() {
         save({ credential: command.credential, code: result.state.code })
         update(result.state)
         setMessage(
-          command.kind === 'seat'
-            ? '座位已保存。'
-            : command.kind === 'start'
-              ? '本副已开始，手牌已保存。'
-              : result.state.board
-                ? '已加入，请等待下一副入座。'
-                : '已进入房间，选一个座位吧。',
+          command.kind === 'call'
+            ? '叫牌已保存。'
+            : command.kind === 'seat'
+              ? '座位已保存。'
+              : command.kind === 'start'
+                ? '本副已开始，手牌已保存。'
+                : result.state.board
+                  ? '已加入，请等待下一副入座。'
+                  : '已进入房间，选一个座位吧。',
         )
       } else {
         setMessage(result.message)
@@ -180,6 +184,17 @@ export default function App() {
         seat,
       })
   }
+  function call(call: Call) {
+    if (state && session)
+      void send({
+        kind: 'call',
+        code: state.code,
+        credential: session.credential,
+        operationId: operationId(),
+        expectedVersion: state.version,
+        call,
+      })
+  }
   function start() {
     if (state && session)
       void send({
@@ -211,7 +226,7 @@ export default function App() {
           (restoring
             ? '正在恢复你的房间和座位…'
             : state?.board
-              ? '本副已发牌；当前仅开放手牌查看，叫牌操作尚未开放。'
+              ? '牌局已恢复。请查看当前行动方与公开叫牌记录。'
               : '南北搭档，东西搭档。选好座位，等朋友到齐。')}
         {session?.pending && (
           <button disabled={busy} onClick={() => void send(session.pending!)}>
@@ -326,6 +341,13 @@ export default function App() {
               onChoose={choose}
             />
             <aside className="panel members">
+              {state.board && (
+                <AuctionPanel
+                  board={state.board}
+                  locked={busy || !!session?.pending || !connected}
+                  onCall={call}
+                />
+              )}
               <h2>
                 本桌牌友 <small>{state.members.length} / 4</small>
               </h2>

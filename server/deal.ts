@@ -1,3 +1,4 @@
+import { legalCalls } from './auction.ts'
 import { randomInt } from 'node:crypto'
 import { seats, suits, ranks } from '../shared/protocol.ts'
 import type {
@@ -12,8 +13,10 @@ export interface StoredBoard {
   number: number
   dealer: Seat
   vulnerability: BoardView['vulnerability']
-  turn: Seat
-  phase: 'auction'
+  turn: Seat | null
+  phase: BoardView['phase']
+  auction: BoardView['auction']
+  contract: BoardView['contract']
   occupants: Record<Seat, string | null>
   hands: Record<Seat, Card[]>
 }
@@ -48,6 +51,8 @@ export function dealBoard(members: Member[], deck: Card[]): StoredBoard {
     vulnerability: 'none',
     turn: 'north',
     phase: 'auction',
+    auction: [],
+    contract: null,
     occupants,
     hands,
   }
@@ -75,6 +80,9 @@ export function visibleBoard(
       turn: board.turn,
       phase: board.phase,
       seats: publicSeats,
+      auction: board.auction ?? [],
+      contract: board.contract ?? null,
+      legalCalls: ownSeat === board.turn ? legalCalls(board) : [],
     },
     hand: ownSeat ? [...board.hands[ownSeat]] : [],
   }

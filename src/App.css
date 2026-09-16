@@ -464,3 +464,47 @@ footer {
     font-size: 18px;
   }
 }
+.auction-panel {
+  border-bottom: 1px solid #cbd5c4;
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+}
+.auction-controls {
+  display: grid;
+  gap: 10px;
+}
+.auction-controls select {
+  width: 100%;
+  min-height: 48px;
+  font: inherit;
+  color: #233d32;
+  background: #fffef8;
+  border: 1px solid #b5c3ad;
+  border-radius: 6px;
+  padding: 8px;
+}
+.call-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.call-actions button {
+  flex: 1 1 auto;
+  min-height: 48px;
+  padding: 8px;
+}
+.auction-history summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+.members .auction-history ol {
+  display: block;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+}
+.members .auction-history li {
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+}

@@ -46,7 +46,14 @@ export function PlayTable({
           <strong>第 {board.number} 副</strong>
           <span>发牌人：{seatNames[board.dealer]}家</span>
           <span>{vulnerabilityNames[board.vulnerability]}</span>
-          <span>阶段：叫牌</span>
+          <span>
+            阶段：
+            {board.phase === 'auction'
+              ? '叫牌'
+              : board.phase === 'passed-out'
+                ? '本副结束'
+                : '等待首攻'}
+          </span>
         </section>
       )}
       <section className="table" aria-label="四方座位">
@@ -82,7 +89,13 @@ export function PlayTable({
         })}
         <div className="table-center">
           <span aria-hidden="true">♣</span>
-          <h3>{board ? `${seatNames[board.turn]}家叫牌` : '等待牌友入座'}</h3>
+          <h3>
+            {board
+              ? board.turn
+                ? `${seatNames[board.turn]}家${board.phase === 'auction' ? '叫牌' : '首攻'}`
+                : '四家不叫，本副结束'
+              : '等待牌友入座'}
+          </h3>
           <p>南北一队 · 东西一队</p>
         </div>
       </section>
@@ -109,7 +122,7 @@ export function PlayTable({
                 )
               })}
           </ul>
-          <p className="muted">已发牌。叫牌操作及电脑自动行动将在后续开放。</p>
+          <p className="muted">手牌仅本人可见；叫牌记录向本桌牌友公开。</p>
         </section>
       )}
     </div>

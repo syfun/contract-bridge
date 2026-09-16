@@ -115,7 +115,7 @@ test(
       operationId: 'host-seat',
       code,
       expectedVersion: 3,
-      seat: 'south',
+      seat: 'north',
     })
     assert.equal(hostSeat.status, 'accepted')
     await Promise.all([hostSeated, guestSeated])
@@ -162,7 +162,10 @@ test(
         'version',
       ])
       assert.deepEqual(Object.keys(state.board!).sort(), [
+        'auction',
+        'contract',
         'dealer',
+        'legalCalls',
         'number',
         'phase',
         'seats',
@@ -196,5 +199,34 @@ test(
       })
     ).json()
     assert.deepEqual(snapshot, { status: 'accepted', state: guestState })
+    const hostCall = once(a.socket, 'state')
+    const guestCall = once(restoredDeal.socket, 'state')
+    const waitingCall = once(observer.socket, 'state')
+    const called = await submit({
+      kind: 'call',
+      credential: host,
+      code,
+      operationId: 'call',
+      expectedVersion: 6,
+      call: { kind: 'bid', level: 1, denomination: 'H' },
+    })
+    if (called.status !== 'accepted') throw Error(called.message)
+    const updates = await Promise.all([hostCall, guestCall, waitingCall])
+    for (const [state] of updates) {
+      assert.deepEqual(state.board!.auction, [
+        { seat: 'north', call: { kind: 'bid', level: 1, denomination: 'H' } },
+      ])
+      assert.equal(state.board!.turn, 'east')
+    }
+    assert.deepEqual(updates[0][0].hand, hostState.hand)
+    assert.deepEqual(updates[1][0].hand, guestState.hand)
+    assert.deepEqual(updates[2][0].hand, [])
+    assert.deepEqual(updates[0][0].board!.legalCalls, [])
+    assert.ok(
+      updates[1][0].board!.legalCalls.some((call) => call.kind === 'double'),
+    )
+    assert.deepEqual(updates[2][0].board!.legalCalls, [])
+    restoredDeal.socket.disconnect()
+    assert.deepEqual((await connect(guest)).state, updates[1][0])
   },
 )

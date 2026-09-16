@@ -164,6 +164,9 @@ test('一名真人开局后空位由电脑补齐，只返回本人十三张牌',
     vulnerability: 'none',
     turn: 'north',
     phase: 'auction',
+    auction: [],
+    contract: null,
+    legalCalls: [],
     seats: {
       north: { memberId: null, controller: 'computer', cardCount: 13 },
       east: { memberId: null, controller: 'computer', cardCount: 13 },
@@ -194,7 +197,10 @@ test('开局后座位锁定，等待者和中途加入者不能领取电脑手�
       'version',
     ])
     assert.deepEqual(Object.keys(state.board!).sort(), [
+      'auction',
+      'contract',
       'dealer',
+      'legalCalls',
       'number',
       'phase',
       'seats',
