@@ -149,3 +149,7 @@ dist-ssr/
 
 # Local room database
 data/
+
+# Browser test artifacts
+test-results/
+playwright-report/
