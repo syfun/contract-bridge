@@ -97,7 +97,7 @@ export interface BoardView {
   >
 }
 export interface RoomState {
-  pause: { reason: 'host' } | null
+  pause: { reason: 'host' | 'all-offline' | 'restart' } | null
   code: string
   version: number
   scores: Scores

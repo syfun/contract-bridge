@@ -1,3 +1,4 @@
+import { assertRecovered, reconnectAndResume } from './fixtures/recovery.ts'
 import { test, type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -80,6 +81,7 @@ function table(t: TestContext, count = 4) {
     read,
     command,
     call: (call: unknown) => accepted(service.execute(command(call))),
+    resume() { reconnectAndResume(service, code, identities) },
     restart() {
       service.close()
       service = new GameService(path)
@@ -282,13 +284,14 @@ test('叫牌与操作记录同事务回滚，确认丢失及重启后重试只�
   assert.deepEqual(latest.hand, before.hand)
   assert.deepEqual(accepted(room.service.execute(command)), latest)
   room.restart()
-  assert.deepEqual(room.read(), latest)
-  assert.deepEqual(accepted(room.service.execute(command)), latest)
+  assertRecovered(room.read(), latest)
+  assert.deepEqual(accepted(room.service.execute(command)), room.read())
+  room.resume()
   room.call({ kind: 'pass' })
   room.call({ kind: 'pass' })
   const ended = room.read()
   room.restart()
-  assert.deepEqual(room.read(), ended)
+  assertRecovered(room.read(), ended)
 })
 
 test('等待者可查看公开记录和行动方但不能叫牌，合法操作按身份提供且暗牌不公开', (t) => {

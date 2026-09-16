@@ -1,3 +1,4 @@
+import { assertRecovered } from './fixtures/recovery.ts'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -25,10 +26,9 @@ test('建房后凭持久身份读取房主和加入顺序，重启后恢复', ()
     assert.equal(result.state.members[0].joinedOrder, 1)
     service.close()
     service = new GameService(path)
-    assert.deepEqual(service.read(result.state.code, credential), {
-      status: 'accepted',
-      state: result.state,
-    })
+    const restored = service.read(result.state.code, credential)
+    assert.equal(restored.status, 'accepted')
+    if (restored.status === 'accepted') assertRecovered(restored.state, result.state)
   } finally {
     service.close()
     rmSync(dir, { recursive: true, force: true })

@@ -106,6 +106,7 @@ export class GameService {
   private now: () => number
   private connections = new Map<string, { code: string; memberId: string }>()
   // 网络观察独立于存档；保存失败时保留原检测时间，tick 会重试。
+  private pendingOfflinePause = new Set<string>()
   private observed = new Map<string, Map<string, number | null>>()
   constructor(path: string, options: { deck?: () => Card[]; now?: () => number } = {}) {
     this.deck = options.deck ?? shuffledDeck
@@ -115,18 +116,23 @@ export class GameService {
       CREATE TABLE IF NOT EXISTS identities (hash TEXT PRIMARY KEY, room TEXT, member TEXT);
       CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS operations (identity TEXT, id TEXT, command TEXT, version INTEGER, PRIMARY KEY(identity, id));`)
-    // 第 05 票存档可能停在待结算或全体不叫；升级时一次性补齐结算。
+    // 恢复与启动连接检测一起提交，成功前不对外提供服务。
     try {
       this.db.exec('BEGIN IMMEDIATE')
       const rows = this.db.prepare('SELECT code, state FROM rooms').all()
+      const deadline = this.now() + 30_000
       for (const row of rows) {
         const room: StoredRoom = JSON.parse(String(row.state))
-        if (settleRoom(room)) {
-          room.version++
-          this.db
-            .prepare('UPDATE rooms SET state = ? WHERE code = ?')
-            .run(JSON.stringify(room), String(row.code))
+        const before = JSON.stringify(room)
+        settleRoom(room)
+        if (room.board) room.pause ??= { reason: 'restart' }
+        const offline = room.offline ??= {}
+        for (const member of room.members) {
+          offline[member.id] ??= { deadline, takenOver: false }
+          this.observe(room.code, member.id, offline[member.id].deadline)
         }
+        if (before !== JSON.stringify(room))
+          this.persistRoom(room, `recovery:${room.code}`, `version-${room.version + 1}`, 'restart')
       }
       this.db.exec('COMMIT')
     } catch (error) {
@@ -157,6 +163,11 @@ export class GameService {
     const { code, memberId } = connection
     if (![...this.connections.values()].some((other) => other.code === code && other.memberId === memberId))
       this.observe(code, memberId, this.now() + 30_000)
+    const room = this.room(code)
+    if (room?.board && room.members.every((member) => {
+      const observation = this.observed.get(code)?.get(member.id)
+      return observation === undefined ? !!room.offline?.[member.id] : observation !== null
+    })) this.pendingOfflinePause.add(code)
     return this.reconcilePresence(code, memberId)
   }
   private observe(code: string, memberId: string, deadline: number | null) {
@@ -181,8 +192,8 @@ export class GameService {
         this.db.exec('ROLLBACK')
         return { status: 'room_not_found', message: '房间不存在。' }
       }
-      const before = JSON.stringify(room.offline ?? {})
       const offline = room.offline ??= {}
+      const before = JSON.stringify(room)
       for (const [memberId, deadline] of this.observed.get(code) ?? []) {
         if (deadline === null) delete offline[memberId]
         else offline[memberId] ??= { deadline, takenOver: false }
@@ -190,13 +201,23 @@ export class GameService {
       for (const state of Object.values(offline)) {
         if (state.deadline <= this.now()) state.takenOver = true
       }
-      if (before === JSON.stringify(offline)) {
+      if (room.board && (this.pendingOfflinePause.has(code) || room.members.every((member) => offline[member.id])))
+        room.pause ??= { reason: 'all-offline' }
+      if (offline[room.hostId]?.deadline <= this.now()) {
+        const successor = room.members
+          .filter((member) => !offline[member.id])
+          .sort((a, b) => a.joinedOrder - b.joinedOrder)[0]
+        if (successor) room.hostId = successor.id
+      }
+      if (before === JSON.stringify(room)) {
+        this.pendingOfflinePause.delete(code)
         this.db.exec('ROLLBACK')
         return { status: 'accepted', state: visibleRoom(room, selfId) }
       }
       this.advanceReadyBoard(room)
       this.persistRoom(room, `presence:${code}`, `version-${room.version + 1}`, JSON.stringify(offline))
       this.db.exec('COMMIT')
+      this.pendingOfflinePause.delete(code)
       return { status: 'accepted', state: visibleRoom(room, selfId), appliedVersion: room.version }
     } catch {
       try { this.db.exec('ROLLBACK') } catch { /* BEGIN 失败时没有事务。 */ }
@@ -280,6 +301,7 @@ export class GameService {
     const room = this.room(code)
     const board = room?.board
     if (
+      this.pendingOfflinePause.has(code) ||
       room?.pause ||
       !board ||
       board.phase !== 'auction' ||
@@ -310,7 +332,7 @@ export class GameService {
   computerPlayTurn(code: string): ComputerPlayTurn | null {
     const room = this.room(code)
     const board = room?.board
-    if (room?.pause || !board || !['opening-lead', 'playing'].includes(board.phase) || !board.turn || !board.contract || playController(board, board.turn, computerMembers(room!)) !== null)
+    if (this.pendingOfflinePause.has(code) || room?.pause || !board || !['opening-lead', 'playing'].includes(board.phase) || !board.turn || !board.contract || playController(board, board.turn, computerMembers(room!)) !== null)
       return null
     const dummy = dummySeat(board)!
     const controller = board.turn === dummy ? board.contract.declarer : board.turn
@@ -571,8 +593,10 @@ export class GameService {
             ? { id: '', nickname: '', joinedOrder: 0, seat: computer.seat }
             : room.members.find((m) => m.id === memberId)
           if (!member) return reject('unauthorized', '你不属于这个房间。')
-          if (!computer && room.offline?.[memberId] && ['call', 'play', 'ready'].includes(command.kind))
+          if (!computer && room.offline?.[memberId] && ['call', 'play', 'ready', 'resume'].includes(command.kind))
             return reject('unauthorized', '你的座位正在等待重连或由电脑接管，请先恢复连接。')
+          if (this.pendingOfflinePause.has(room.code))
+            return reject('paused', '全员离线暂停正在保存，请稍后重试。')
           if (room.pause && !['pause', 'resume', 'seat'].includes(command.kind))
             return reject('paused', '牌桌已暂停，请等待房主恢复。')
           if (command.kind === 'pause' || command.kind === 'resume') {

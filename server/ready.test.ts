@@ -1,3 +1,4 @@
+import { assertRecoveredOperation, reconnectAndResume } from './fixtures/recovery.ts'
 import { test, type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -74,6 +75,7 @@ function table(t: TestContext) {
     get service() {
       return service
     },
+    resume() { reconnectAndResume(service, code, identities) },
     restart() {
       service.close()
       service = new GameService(path)
@@ -152,7 +154,8 @@ test('最后准备失败原子回滚，并发与确认丢失重试只产生一�
     assert.equal(room.read(i).board!.reviewHands, null)
   }
   room.restart()
-  assert.deepEqual(room.service.execute(final), results[0])
+  assertRecoveredOperation(room.service.execute(final), results[0])
+  room.resume()
   assert.equal(room.service.execute(room.command(3, { kind: 'ready' })).status, 'illegal_action')
 })
 
@@ -188,6 +191,7 @@ test('已登记电脑座位自动准备，未参与本副的等待者不能代�
   db.prepare('UPDATE rooms SET state = ? WHERE code = ?').run(JSON.stringify(stored), room.code)
   db.close()
   room.restart()
+  room.resume()
   for (const seat of ['east', 'south', 'west'] as const) assert.equal(room.read().board!.seats[seat].ready, true)
   assert.equal(room.service.execute(room.command(1, { kind: 'ready' })).status, 'unauthorized')
   accepted(room.service.execute(room.command(0, { kind: 'ready' })))

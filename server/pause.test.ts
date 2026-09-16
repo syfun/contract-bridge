@@ -1,3 +1,4 @@
+import { assertRecovered, assertRecoveredOperation } from './fixtures/recovery.ts'
 import { test, type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -31,7 +32,10 @@ function table(t: TestContext, humans = 4) {
     accepted(send(i, { kind: 'seat', seat: seats[i] }))
   }
   accepted(send(0, { kind: 'start' }))
-  return { path, code, read, send, command, get service() { return service }, restart() { service.close(); service = new GameService(path, { deck: () => deck }) } }
+  const reconnect = () => {
+    for (let i = 0; i < humans; i++) accepted(service.connect(code, identities[i], `return-${i}`))
+  }
+  return { path, code, reconnect, read, send, command, get service() { return service }, restart() { service.close(); service = new GameService(path, { deck: () => deck }) } }
 }
 
 test('仅房主可暂停恢复，暂停原因跨读取和重启保留且原轮次继续', (t) => {
@@ -46,6 +50,7 @@ test('仅房主可暂停恢复，暂停原因跨读取和重启保留且原轮�
   assert.equal(room.send(0, { kind: 'call', call: { kind: 'pass' } }).status, 'paused')
   assert.equal(room.send(1, { kind: 'resume' }).status, 'unauthorized')
   room.restart()
+  room.reconnect()
   assert.deepEqual(room.read().pause, { reason: 'host' })
   accepted(room.send(0, { kind: 'resume' }))
   assert.equal(room.read().pause, null)
@@ -124,7 +129,8 @@ test('暂停拦截最后准备，保留已准备座位及分数，恢复后仅�
   assert.equal(room.send(3, { kind: 'ready' }).status, 'paused')
   assert.deepEqual(room.read(), paused)
   room.restart()
-  assert.deepEqual(room.read(), paused)
+  assertRecovered(room.read(), paused)
+  room.reconnect()
   accepted(room.send(0, { kind: 'resume' }))
   const ready = room.command(3, { kind: 'ready' })
   accepted(room.service.execute(ready))
@@ -156,7 +162,9 @@ test('暂停恢复持久化失败不改变状态，同版本竞态及确认丢�
     assert.equal(results[2].status, 'stale_state')
     assert.equal(room.read().version, before.version + 1)
     room.restart()
-    assert.deepEqual(room.service.execute(command), results[0])
+    assertRecoveredOperation(room.service.execute(command), results[0])
+    room.reconnect()
+    if (kind === 'resume') accepted(room.send(0, { kind: 'resume' }))
     assert.equal(room.service.execute({ ...command, kind: kind === 'pause' ? 'resume' : 'pause' }).status, 'operation_conflict')
     assert.equal(room.send(0, { kind }).status, 'illegal_action')
   }

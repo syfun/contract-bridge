@@ -1,3 +1,4 @@
+import { assertRecovered, assertRecoveredOperation, reconnectAndResume } from './fixtures/recovery.ts'
 import { test, type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -75,6 +76,7 @@ function table(
     ) {
       return accepted(service.execute(command(i, { kind: 'play', seat, card })))
     },
+    resume() { reconnectAndResume(service, code, identities) },
     restart() {
       service.close()
       service = new GameService(path)
@@ -121,7 +123,7 @@ test('首攻后公开明手，仅庄家能控制明手，连续十三墩完成�
   )
   assert.deepEqual(state.board!.legalCards, [])
   room.restart()
-  assert.deepEqual(room.read(), state)
+  assertRecovered(room.read(), state)
 })
 
 function arranged(first: Card[][]) {
@@ -229,7 +231,8 @@ test('出牌提交失败回滚，重试、重启和过期版本不会重复出�
     'stale_state',
   )
   room.restart()
-  assert.deepEqual(room.service.execute(command), first)
+  assertRecoveredOperation(room.service.execute(command), first)
+  room.resume()
   room.play('south', 'D2')
   assert.equal(
     accepted(room.service.execute(command)).board!.currentTrick.length,

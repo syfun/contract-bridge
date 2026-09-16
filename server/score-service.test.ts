@@ -1,3 +1,4 @@
+import { assertRecovered, assertRecoveredOperation } from './fixtures/recovery.ts'
 import { test, type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -106,7 +107,7 @@ test('四家不叫自动零分结算，结束前隐藏四家原始手牌，结�
       )
   }
   room.restart()
-  assert.deepEqual(room.read(3), state)
+  assertRecovered(room.read(3), state)
 })
 
 test('十三墩后自动结算成约与超墩，累计按方位保存，公开原始手牌与记录', (t) => {
@@ -146,7 +147,7 @@ test('十三墩后自动结算成约与超墩，累计按方位保存，公开�
   accepted(room.service.execute(final))
   room.restart()
   accepted(room.service.execute(final))
-  assert.deepEqual(room.read(), state)
+  assertRecovered(room.read(), state)
 })
 
 test('最后一张牌与宕墩结算同事务回滚，重试和确认丢失不重复扣分', async (t) => {
@@ -188,7 +189,7 @@ test('最后一张牌与宕墩结算同事务回滚，重试和确认丢失不�
     'illegal_action',
   )
   room.restart()
-  assert.deepEqual(room.service.execute(final), result)
+  assertRecoveredOperation(room.service.execute(final), result)
 })
 
 test('东西做庄的加倍成约记入东西累计，南北对称扣分', (t) => {

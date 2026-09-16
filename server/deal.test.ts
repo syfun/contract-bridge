@@ -1,3 +1,4 @@
+import { assertRecovered, assertRecoveredOperation } from './fixtures/recovery.ts'
 import { test, type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -319,8 +320,8 @@ test('开局校验房主、入座、预期版本和阶段，拒绝响应不携�
   assert.equal(room.service.read(room.code, outsider).status, 'unauthorized')
   assert.deepEqual(room.read(), state)
   room.restart()
-  assert.deepEqual(room.read(), state)
-  assert.deepEqual(room.service.execute(command), started)
+  assertRecovered(room.read(), state)
+  assertRecoveredOperation(room.service.execute(command), started)
 })
 
 test('SQLite 操作记录写入失败时发牌一起回滚，重试只提交一副', async (t) => {

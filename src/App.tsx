@@ -375,7 +375,7 @@ export default function App() {
           {state.board && (
             <section className={`pause-controls${state.pause ? ' is-paused' : ''}`} aria-label="牌桌暂停与恢复">
               <div role="status">
-                <strong>{state.pause ? '牌桌已暂停 · 房主暂停' : '牌桌进行中'}</strong>
+                <strong>{state.pause ? `牌桌已暂停 · ${{ host: '房主暂停', 'all-offline': '全员离线', restart: '服务重启恢复' }[state.pause.reason]}` : '牌桌进行中'}</strong>
                 <p>{state.pause
                   ? '进度已保存，叫牌、出牌和下一副准备已停用。等待房主恢复后继续。'
                   : '正常轮次不限时，可由房主暂停整桌。'}</p>
