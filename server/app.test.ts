@@ -164,11 +164,15 @@ test(
       assert.deepEqual(Object.keys(state.board!).sort(), [
         'auction',
         'contract',
+        'currentTrick',
         'dealer',
+        'dummy',
         'legalCalls',
+        'legalCards',
         'number',
         'phase',
         'seats',
+        'tricks',
         'turn',
         'vulnerability',
       ])

@@ -103,7 +103,7 @@ export function AuctionPanel({
         </>
       )}
       {board.phase === 'opening-lead' && (
-        <p className="muted">叫牌已保存。首攻出牌将在后续开放。</p>
+        <p className="muted">请选择合法牌并确认首攻；首攻提交后公开明手。</p>
       )}
       <details className="auction-history" open>
         <summary>公开叫牌记录 · {board.auction.length} 次</summary>

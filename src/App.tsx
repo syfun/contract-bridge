@@ -3,6 +3,7 @@ import { io } from 'socket.io-client'
 import { seatNames } from '../shared/protocol.ts'
 import type {
   Call,
+  Card,
   Command,
   JoinVersion,
   Result,
@@ -97,15 +98,17 @@ export default function App() {
         save({ credential: command.credential, code: result.state.code })
         update(result.state)
         setMessage(
-          command.kind === 'call'
-            ? '叫牌已保存。'
-            : command.kind === 'seat'
-              ? '座位已保存。'
-              : command.kind === 'start'
-                ? '本副已开始，手牌已保存。'
-                : result.state.board
-                  ? '已加入，请等待下一副入座。'
-                  : '已进入房间，选一个座位吧。',
+          command.kind === 'play'
+            ? '出牌已保存。'
+            : command.kind === 'call'
+              ? '叫牌已保存。'
+              : command.kind === 'seat'
+                ? '座位已保存。'
+                : command.kind === 'start'
+                  ? '本副已开始，手牌已保存。'
+                  : result.state.board
+                    ? '已加入，请等待下一副入座。'
+                    : '已进入房间，选一个座位吧。',
         )
       } else {
         setMessage(result.message)
@@ -193,6 +196,18 @@ export default function App() {
         operationId: operationId(),
         expectedVersion: state.version,
         call,
+      })
+  }
+  function play(seat: Seat, card: Card) {
+    if (state && session)
+      void send({
+        kind: 'play',
+        code: state.code,
+        credential: session.credential,
+        operationId: operationId(),
+        expectedVersion: state.version,
+        seat,
+        card,
       })
   }
   function start() {
@@ -339,6 +354,7 @@ export default function App() {
               state={state}
               locked={busy || !!session?.pending || !connected}
               onChoose={choose}
+              onPlay={play}
             />
             <aside className="panel members">
               {state.board && (

@@ -508,3 +508,36 @@ footer {
   padding: 8px 0;
   font-size: 14px;
 }
+
+.hand-cards > li {
+  list-style: none;
+}
+button.playing-card {
+  min-width: 48px;
+  min-height: 72px;
+  cursor: pointer;
+}
+button.playing-card:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+button.playing-card.selected {
+  outline: 3px solid #246445;
+  transform: translateY(-5px);
+  background: #e7f5dc;
+}
+.play-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.trick-panel {
+  margin-top: 18px;
+}
+.trick-panel li {
+  margin: 10px 0;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}

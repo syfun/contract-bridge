@@ -1,3 +1,4 @@
+import { applyPlay, playController } from './play.ts'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { applyCall, isCall } from './auction.ts'
@@ -112,7 +113,11 @@ export class GameService {
       command.operationId.length > 128
     )
       return { status: 'illegal_action', message: '缺少有效身份或操作标识。' }
-    if (!['create', 'join', 'seat', 'start', 'call'].includes(command.kind))
+    if (
+      !['create', 'join', 'seat', 'start', 'call', 'play'].includes(
+        command.kind,
+      )
+    )
       return { status: 'illegal_action', message: '不支持的操作。' }
     if (
       command.kind !== 'create' &&
@@ -137,6 +142,13 @@ export class GameService {
       return { status: 'illegal_action', message: '座位或状态版本不正确。' }
     if (command.kind === 'call' && !isCall(command.call))
       return { status: 'illegal_action', message: '叫品格式不正确。' }
+    if (
+      command.kind === 'play' &&
+      (!seats.includes(command.seat) ||
+        typeof command.card !== 'string' ||
+        !/^[SHDC](?:[2-9]|10|[JQKA])$/.test(command.card))
+    )
+      return { status: 'illegal_action', message: '出牌格式不正确。' }
     const hash = digest(command.credential)
     // 不保存明文凭据；固定字段顺序使网络重试不依赖 JSON 键顺序。
     const fingerprint = JSON.stringify(
@@ -156,18 +168,26 @@ export class GameService {
                 command.expectedVersion,
                 command.seat,
               ]
-            : command.kind === 'call'
+            : command.kind === 'play'
               ? [
                   command.kind,
                   command.code,
                   command.expectedVersion,
-                  command.call.kind,
-                  command.call.kind === 'bid' ? command.call.level : null,
-                  command.call.kind === 'bid'
-                    ? command.call.denomination
-                    : null,
+                  command.seat,
+                  command.card,
                 ]
-              : [command.kind, command.code, command.expectedVersion],
+              : command.kind === 'call'
+                ? [
+                    command.kind,
+                    command.code,
+                    command.expectedVersion,
+                    command.call.kind,
+                    command.call.kind === 'bid' ? command.call.level : null,
+                    command.call.kind === 'bid'
+                      ? command.call.denomination
+                      : null,
+                  ]
+                : [command.kind, command.code, command.expectedVersion],
     )
     try {
       // 同步事务内无 await，操作在单一服务进程中顺序提交。
@@ -250,7 +270,20 @@ export class GameService {
             return reject('stale_state', '房间状态已更新，请重新操作。')
           const member = room.members.find((m) => m.id === memberId)
           if (!member) return reject('unauthorized', '你不属于这个房间。')
-          if (command.kind === 'call') {
+          if (command.kind === 'play') {
+            if (
+              !room.board ||
+              !['opening-lead', 'playing'].includes(room.board.phase)
+            )
+              return reject('illegal_action', '当前不在出牌阶段。')
+            if (playController(room.board, command.seat) !== memberId)
+              return reject('unauthorized', '你无权操作这手牌。')
+            if (!applyPlay(room.board, command.seat, command.card))
+              return reject(
+                'illegal_action',
+                '请按轮次选择合法牌；有首引花色时必须跟牌。',
+              )
+          } else if (command.kind === 'call') {
             if (!room.board || room.board.phase !== 'auction')
               return reject('illegal_action', '当前不在叫牌阶段。')
             if (!member.seat || room.board.occupants[member.seat] !== memberId)

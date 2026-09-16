@@ -1,29 +1,24 @@
-import { ranks, seats, seatNames, suits } from '../shared/protocol.ts'
+import { HandPanel } from './HandPanel.tsx'
+import { cardLabel } from './card-label.ts'
+import { seats, seatNames } from '../shared/protocol.ts'
 import type { Card, RoomState, Seat } from '../shared/protocol.ts'
 
-const suitSymbols = { S: '♠', H: '♥', D: '♦', C: '♣' }
-const suitNames = { S: '黑桃', H: '红桃', D: '方块', C: '梅花' }
 const vulnerabilityNames = {
   none: '双方无局',
   'north-south': '南北有局',
   'east-west': '东西有局',
   both: '双方有局',
 }
-function cardOrder(card: Card) {
-  return (
-    suits.indexOf(card[0] as (typeof suits)[number]) * 13 -
-    ranks.indexOf(card.slice(1) as (typeof ranks)[number])
-  )
-}
-
 export function PlayTable({
   state,
   locked,
   onChoose,
+  onPlay,
 }: {
   state: RoomState
   locked: boolean
   onChoose: (seat: Seat) => void
+  onPlay: (seat: Seat, card: Card) => void
 }) {
   const self = state.members.find((member) => member.id === state.selfId)
   const board = state.board
@@ -52,7 +47,11 @@ export function PlayTable({
               ? '叫牌'
               : board.phase === 'passed-out'
                 ? '本副结束'
-                : '等待首攻'}
+                : board.phase === 'playing'
+                  ? '打牌'
+                  : board.phase === 'awaiting-score'
+                    ? '待结算'
+                    : '等待首攻'}
           </span>
         </section>
       )}
@@ -92,38 +91,87 @@ export function PlayTable({
           <h3>
             {board
               ? board.turn
-                ? `${seatNames[board.turn]}家${board.phase === 'auction' ? '叫牌' : '首攻'}`
-                : '四家不叫，本副结束'
+                ? `${seatNames[board.turn]}家${board.phase === 'auction' ? '叫牌' : board.phase === 'opening-lead' ? '首攻' : '出牌'}`
+                : board.phase === 'awaiting-score'
+                  ? '十三墩完成，待结算'
+                  : '四家不叫，本副结束'
               : '等待牌友入座'}
           </h3>
           <p>南北一队 · 东西一队</p>
         </div>
       </section>
       {board && (
-        <section className="panel hand-panel" aria-label="本人手牌">
-          <div className="hand-heading">
-            <h2>{self?.seat && seatNames[self.seat]}家手牌</h2>
-            <small>仅你可见 · {state.hand.length} 张</small>
-          </div>
-          <ul className="hand-cards">
-            {[...state.hand]
-              .sort((a, b) => cardOrder(a) - cardOrder(b))
-              .map((card) => {
-                const suit = card[0] as keyof typeof suitSymbols
-                return (
-                  <li
-                    key={card}
-                    className={`playing-card ${suit === 'H' || suit === 'D' ? 'red' : ''}`}
-                    aria-label={`${suitNames[suit]} ${card.slice(1)}`}
-                  >
-                    <strong>{card.slice(1)}</strong>
-                    <span aria-hidden="true">{suitSymbols[suit]}</span>
+        <>
+          <section className="panel trick-panel" aria-label="公开出牌记录">
+            <h2>当前墩 · 第 {Math.min(board.tricks.length + 1, 13)} 墩</h2>
+            <p>
+              {board.currentTrick.length
+                ? board.currentTrick
+                    .map(
+                      (entry) =>
+                        `${seatNames[entry.seat]}家 ${cardLabel(entry.card)}`,
+                    )
+                    .join(' · ')
+                : board.phase === 'awaiting-score'
+                  ? '十三墩已全部完成。'
+                  : '等待首引。'}
+            </p>
+            <p>
+              南北{' '}
+              {
+                board.tricks.filter(
+                  (trick) =>
+                    trick.winner === 'north' || trick.winner === 'south',
+                ).length
+              }{' '}
+              墩 · 东西{' '}
+              {
+                board.tricks.filter(
+                  (trick) => trick.winner === 'east' || trick.winner === 'west',
+                ).length
+              }{' '}
+              墩
+            </p>
+            <details open>
+              <summary>完整出牌记录 · {board.tricks.length} 墩</summary>
+              <ol>
+                {board.tricks.map((trick, index) => (
+                  <li key={index}>
+                    第 {index + 1} 墩：
+                    {trick.cards
+                      .map(
+                        (entry) =>
+                          `${seatNames[entry.seat]} ${cardLabel(entry.card)}`,
+                      )
+                      .join(' → ')}
+                    ；{seatNames[trick.winner]}家赢墩
                   </li>
-                )
-              })}
-          </ul>
-          <p className="muted">手牌仅本人可见；叫牌记录向本桌牌友公开。</p>
-        </section>
+                ))}
+              </ol>
+            </details>
+          </section>
+          {board.dummy && (
+            <HandPanel
+              key={`dummy-${state.version}`}
+              hand={board.dummy.hand}
+              seat={board.dummy.seat}
+              dummy
+              legal={board.turn === board.dummy.seat ? board.legalCards : []}
+              locked={locked}
+              onPlay={onPlay}
+            />
+          )}
+          {self?.seat && self.seat !== board.dummy?.seat && (
+            <HandPanel
+              key={`own-${state.version}`}
+              hand={state.hand}
+              seat={self.seat}
+              legal={board.turn === self.seat ? board.legalCards : []}
+              locked={locked}
+              onPlay={onPlay}
+            />
+          )}
+        </>
       )}
     </div>
   )

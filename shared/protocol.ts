@@ -45,12 +45,29 @@ export interface Contract {
   declarer: Seat
   openingLeader: Seat
 }
+export interface PlayEntry {
+  seat: Seat
+  card: Card
+}
+export interface Trick {
+  cards: PlayEntry[]
+  winner: Seat
+}
 export interface BoardView {
   number: number
   dealer: Seat
   vulnerability: 'none' | 'north-south' | 'east-west' | 'both'
   turn: Seat | null
-  phase: 'auction' | 'opening-lead' | 'passed-out'
+  phase:
+    | 'auction'
+    | 'opening-lead'
+    | 'playing'
+    | 'awaiting-score'
+    | 'passed-out'
+  dummy: { seat: Seat; hand: Card[] } | null
+  currentTrick: PlayEntry[]
+  tricks: Trick[]
+  legalCards: Card[]
   auction: AuctionEntry[]
   contract: Contract | null
   legalCalls: Call[]
@@ -75,6 +92,13 @@ export interface RoomState {
 export type Command = { credential: string; operationId: string } & (
   | { kind: 'create'; nickname: string }
   | { kind: 'join'; nickname: string; code: string; expectedVersion: number }
+  | {
+      kind: 'play'
+      code: string
+      expectedVersion: number
+      seat: Seat
+      card: Card
+    }
   | { kind: 'call'; code: string; expectedVersion: number; call: Call }
   | { kind: 'start'; code: string; expectedVersion: number }
   | { kind: 'seat'; code: string; expectedVersion: number; seat: Seat }

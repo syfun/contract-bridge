@@ -1,3 +1,4 @@
+import { dummySeat, legalCards, playController } from './play.ts'
 import { legalCalls } from './auction.ts'
 import { randomInt } from 'node:crypto'
 import { seats, suits, ranks } from '../shared/protocol.ts'
@@ -18,6 +19,8 @@ export interface StoredBoard {
   auction: BoardView['auction']
   contract: BoardView['contract']
   occupants: Record<Seat, string | null>
+  currentTrick?: BoardView['currentTrick']
+  tricks?: BoardView['tricks']
   hands: Record<Seat, Card[]>
 }
 
@@ -82,6 +85,17 @@ export function visibleBoard(
       seats: publicSeats,
       auction: board.auction ?? [],
       contract: board.contract ?? null,
+      currentTrick: structuredClone(board.currentTrick ?? []),
+      tricks: structuredClone(board.tricks ?? []),
+      dummy:
+        ownSeat &&
+        (board.phase === 'playing' || board.phase === 'awaiting-score')
+          ? {
+              seat: dummySeat(board)!,
+              hand: [...board.hands[dummySeat(board)!]],
+            }
+          : null,
+      legalCards: playController(board) === selfId ? legalCards(board) : [],
       legalCalls: ownSeat === board.turn ? legalCalls(board) : [],
     },
     hand: ownSeat ? [...board.hands[ownSeat]] : [],
