@@ -47,6 +47,15 @@ export default function App() {
     localStorage.setItem(storageKey, JSON.stringify(value))
     setSession(value)
   }
+  function leaveSession() {
+    localStorage.removeItem(storageKey)
+    setSession(null)
+    setState(null)
+    setConnected(false)
+    setRestoring(false)
+    wasDisconnected.current = false
+    setMessage('已离开房间，座位归属已释放，本桌累计分保留。可重新加入。')
+  }
   function update(next: RoomState) {
     setState((old) =>
       !old || next.code !== old.code || next.version >= old.version
@@ -68,10 +77,17 @@ export default function App() {
       setConnected(false)
       setMessage('连接中断，正在重连。服务端检测掉线后等待 30 秒，之后由电脑接管；你的座位仍会保留。')
     })
-    socket.on('connect_error', () => {
+    socket.on('membership_ended', leaveSession)
+    socket.on('connect_error', async () => {
       setConnected(false)
       setMessage('暂时无法恢复房间，请检查网络或重试。')
       setRestoring(false)
+      try {
+        const result: Result = await fetch(`/api/rooms/${session.code}`, {
+          headers: { Authorization: `Bearer ${session.credential}` },
+        }).then(response => response.json())
+        if (result.status === 'unauthorized') leaveSession()
+      } catch { /* 连接失败时保留原身份，等待重试。 */ }
     })
     socket.on('presence_error', (message: string) => {
       setConnected(false)
@@ -87,6 +103,7 @@ export default function App() {
       setRestoring(false)
     })
     return () => {
+      socket.removeAllListeners()
       socket.disconnect()
     }
   }, [session?.code, session?.credential])
@@ -109,10 +126,13 @@ export default function App() {
       if (!response.ok) throw Error('request failed')
       const result: Result = await response.json()
       if (result.status === 'accepted') {
+        if (command.kind === 'leave') { leaveSession(); return }
         save({ credential: command.credential, code: result.state.code })
         update(result.state)
         setMessage(
-          command.kind === 'pause'
+          command.kind === 'release'
+            ? '离线座位已释放；请重新准备下一副。'
+            : command.kind === 'pause'
             ? '牌桌已暂停，进度已保存。'
             : command.kind === 'resume'
               ? '牌桌已恢复，从原位置继续。'
@@ -207,6 +227,10 @@ export default function App() {
         seat,
       })
   }
+  function release(seat: Seat) {
+    if (state && session) void send({ kind: 'release', seat, code: state.code,
+      credential: session.credential, operationId: operationId(), expectedVersion: state.version })
+  }
   function call(call: Call) {
     if (state && session)
       void send({
@@ -230,7 +254,7 @@ export default function App() {
         card,
       })
   }
-  function advanceBoard(kind: 'start' | 'ready' | 'pause' | 'resume') {
+  function advanceBoard(kind: 'start' | 'ready' | 'pause' | 'resume' | 'leave') {
     if (state && session)
       void send({
         kind,
@@ -362,7 +386,9 @@ export default function App() {
               {self?.nickname}，
               {self?.seat
                 ? `你已坐在${seatNames[self.seat]}家`
-                : state.board
+                : state.board?.score
+                  ? '本副已结束，请选择无归属座位'
+                  : state.board
                   ? '请等待下一副入座'
                   : '请选择一个空位'}
               <br />
@@ -393,6 +419,7 @@ export default function App() {
           )}
           <div className="room-layout">
             <PlayTable
+              seatLocked={busy || !!session?.pending || !connected}
               state={state}
               locked={actionLocked}
               onChoose={choose}
@@ -447,7 +474,7 @@ export default function App() {
                         : '准备下一副'}
                     </button>
                   ) : (
-                    <p className="muted">你未参与本副，请等待入座。</p>
+                    <p className="muted">请选择无归属的电脑座位，再准备下一副。</p>
                   )}
                 </section>
               )}
@@ -473,6 +500,11 @@ export default function App() {
                             : '正在选座'}
                       </small>
                       <ConnectionStatus member={m} />
+                      {state.hostId === state.selfId && state.board?.score && m.seat && m.connection.status !== 'online' && (
+                        <button disabled={busy || !!session?.pending || !connected} onClick={() => release(m.seat!)}>
+                          释放{seatNames[m.seat]}家座位
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -504,6 +536,9 @@ export default function App() {
                   )}
                 </div>
               )}
+              <button disabled={busy || !!session?.pending || !connected} onClick={() => advanceBoard('leave')}>
+                退出房间并释放座位
+              </button>
               <p className="room-note">
                 同一浏览器刷新后会恢复身份和座位。
                 <br />

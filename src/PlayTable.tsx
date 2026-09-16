@@ -14,17 +14,19 @@ const vulnerabilityNames = {
 export function PlayTable({
   state,
   locked,
+  seatLocked,
   onChoose,
   onPlay,
 }: {
   state: RoomState
   locked: boolean
+  seatLocked: boolean
   onChoose: (seat: Seat) => void
   onPlay: (seat: Seat, card: Card) => void
 }) {
   const self = state.members.find((member) => member.id === state.selfId)
   const board = state.board
-  if (board && !self?.seat)
+  if (board && !board.score && !self?.seat)
     return (
       <section className="panel waiting">
         <span aria-hidden="true">♣</span>
@@ -67,7 +69,7 @@ export function PlayTable({
             <button
               key={seat}
               className={`seat ${seat} ${mine ? 'mine' : ''} ${board?.turn === seat ? 'acting' : ''}`}
-              disabled={locked || !!member || !!board}
+              disabled={seatLocked || !!member || (!!board && !board.score)}
               onClick={() => onChoose(seat)}
               aria-label={`${seatNames[seat]}家，${board ? `${label}，${board.seats[seat].cardCount} 张牌` : (member?.nickname ?? '空位，点击入座')}`}
             >
@@ -76,7 +78,9 @@ export function PlayTable({
               <small>
                 {member
                   ? `${mine ? '你 · ' : ''}${member.id === state.hostId ? '房主' : '已入座'}`
-                  : board
+                  : board?.score
+                    ? '点击接替，准备下一副'
+                    : board
                     ? '电脑座位'
                     : '点击入座'}
               </small>

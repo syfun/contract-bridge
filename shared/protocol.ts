@@ -120,6 +120,8 @@ export type Command = { credential: string; operationId: string } & (
   | { kind: 'call'; code: string; expectedVersion: number; call: Call }
   | { kind: 'pause'; code: string; expectedVersion: number }
   | { kind: 'resume'; code: string; expectedVersion: number }
+  | { kind: 'leave'; code: string; expectedVersion: number }
+  | { kind: 'release'; code: string; expectedVersion: number; seat: Seat }
   | { kind: 'ready'; code: string; expectedVersion: number }
   | { kind: 'start'; code: string; expectedVersion: number }
   | { kind: 'seat'; code: string; expectedVersion: number; seat: Seat }

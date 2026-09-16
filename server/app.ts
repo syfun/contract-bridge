@@ -16,6 +16,10 @@ export async function createApp(databasePath: string, options: { now?: () => num
       if (code === roomCode) {
         const visible = service.read(code, credential)
         if (visible.status === 'accepted') socket.emit('state', visible.state)
+        else if (visible.status === 'unauthorized') {
+          socket.emit('membership_ended')
+          socket.disconnect(true)
+        }
       }
     }
   }

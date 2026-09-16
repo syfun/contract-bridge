@@ -71,6 +71,10 @@ function settleRoom(room: StoredRoom): boolean {
   if (board.phase === 'awaiting-score') board.phase = 'scored'
   return true
 }
+function departureReceipt(code: string, selfId: string, version: number): RoomState {
+  return { code, selfId, version, hostId: '', members: [], board: null, hand: [], pause: null,
+    scores: { 'north-south': 0, 'east-west': 0 } }
+}
 function visibleRoom(room: StoredRoom, selfId: string): RoomState {
   const visible = room.board
     ? visibleBoard(room.board, selfId, computerMembers(room))
@@ -203,7 +207,7 @@ export class GameService {
       }
       if (room.board && (this.pendingOfflinePause.has(code) || room.members.every((member) => offline[member.id])))
         room.pause ??= { reason: 'all-offline' }
-      if (offline[room.hostId]?.deadline <= this.now()) {
+      if (!room.members.some(member => member.id === room.hostId) || offline[room.hostId]?.deadline <= this.now()) {
         const successor = room.members
           .filter((member) => !offline[member.id])
           .sort((a, b) => a.joinedOrder - b.joinedOrder)[0]
@@ -224,9 +228,16 @@ export class GameService {
       return { status: 'storage_failure', message: '连接状态保存失败，正在重试。' }
     }
   }
+  private updateMembershipPresence(room: StoredRoom) {
+    const online = room.members.filter(member => !room.offline?.[member.id])
+    if (!room.hostId) room.hostId = online.sort((a, b) => a.joinedOrder - b.joinedOrder)[0]?.id ?? ''
+    if (room.board && !online.length) room.pause ??= { reason: 'all-offline' }
+  }
   private advanceReadyBoard(room: StoredRoom) {
     const board = room.board
     if (!board?.score || room.pause) return
+    // 四席均已释放时停留在结算，给等待者入座并准备的机会。
+    if (!room.members.some(member => member.seat)) return
     const computers = computerMembers(room)
     if (seats.every((seat) => seatController(board, seat, computers) === null || board.ready?.[seat]))
       room.board = dealBoard(room.members, this.deck(), board.number + 1)
@@ -270,6 +281,8 @@ export class GameService {
           status: 'room_not_found',
           message: '房间不存在，请检查房间码。',
         }
+      if (!room.members.some(member => member.id === identity.member))
+        return { status: 'unauthorized', message: '你已退出或座位已被释放，请重新加入。' }
       return {
         status: 'accepted',
         state: visibleRoom(room, String(identity.member)),
@@ -411,7 +424,7 @@ export class GameService {
     )
       return { status: 'illegal_action', message: '缺少有效身份或操作标识。' }
     if (
-      !['create', 'join', 'seat', 'start', 'call', 'play', 'ready', 'pause', 'resume'].includes(
+      !['create', 'join', 'seat', 'start', 'call', 'play', 'ready', 'pause', 'resume', 'leave', 'release'].includes(
         command.kind,
       )
     )
@@ -434,7 +447,7 @@ export class GameService {
     if (
       (command.kind !== 'create' &&
         !Number.isSafeInteger(command.expectedVersion)) ||
-      (command.kind === 'seat' && !seats.includes(command.seat))
+      ((command.kind === 'seat' || command.kind === 'release') && !seats.includes(command.seat))
     )
       return { status: 'illegal_action', message: '座位或状态版本不正确。' }
     if (command.kind === 'call' && !isCall(command.call))
@@ -460,7 +473,7 @@ export class GameService {
               command.nickname.trim(),
               command.expectedVersion,
             ]
-          : command.kind === 'seat'
+          : command.kind === 'seat' || command.kind === 'release'
             ? [
                 command.kind,
                 command.code,
@@ -516,6 +529,8 @@ export class GameService {
         if (previous.command !== fingerprint)
           return reject('operation_conflict', '操作标识已用于其他操作。')
         this.db.exec('ROLLBACK')
+        if (command.kind === 'leave')
+          return { status: 'accepted', state: departureReceipt(command.code, String(identity.member), Number(previous.version)), appliedVersion: Number(previous.version) }
         const result: Result = computer
           ? {
               status: 'accepted',
@@ -528,6 +543,7 @@ export class GameService {
       }
       let room: StoredRoom
       let memberId = String(identity.member)
+      let removedId: string | undefined
       if (command.kind === 'create') {
         if (identity.room) return reject('unauthorized', '该身份已经加入房间。')
         let code: string
@@ -571,10 +587,12 @@ export class GameService {
           room.members.push({
             id: memberId,
             nickname: command.nickname.trim(),
-            joinedOrder: room.members.length + 1,
+            joinedOrder: Math.max(0, ...room.members.map(member => member.joinedOrder)) + 1,
             seat: null,
           })
         } else {
+          if (!computer && !room.members.some(member => member.id === memberId))
+            return reject('unauthorized', '你已退出或座位已被释放，请重新加入。')
           if (command.expectedVersion !== room.version)
             return reject('stale_state', '房间状态已更新，请重新操作。')
           if (
@@ -597,9 +615,25 @@ export class GameService {
             return reject('unauthorized', '你的座位正在等待重连或由电脑接管，请先恢复连接。')
           if (this.pendingOfflinePause.has(room.code))
             return reject('paused', '全员离线暂停正在保存，请稍后重试。')
-          if (room.pause && !['pause', 'resume', 'seat'].includes(command.kind))
+          if (room.pause && !['pause', 'resume', 'seat', 'leave', 'release'].includes(command.kind))
             return reject('paused', '牌桌已暂停，请等待房主恢复。')
-          if (command.kind === 'pause' || command.kind === 'resume') {
+          if (command.kind === 'leave' || command.kind === 'release') {
+            const target = command.kind === 'leave' ? member : room.members.find(m => m.seat === command.seat)
+            if (command.kind === 'release') {
+              if (memberId !== room.hostId) return reject('unauthorized', '只有房主可以释放离线座位。')
+              if (!room.board?.score) return reject('illegal_action', '只能在两副之间释放离线座位。')
+              if (!target || !room.offline?.[target.id]) return reject('illegal_action', '只能释放离线真人的座位。')
+            }
+            removedId = target!.id
+            room.members = room.members.filter(m => m.id !== removedId)
+            if (target!.seat && room.board) {
+              room.board.occupants[target!.seat] = null
+              room.board.ready = {}
+            }
+            if (room.offline) delete room.offline[removedId]
+            if (room.hostId === removedId) room.hostId = ''
+            this.updateMembershipPresence(room)
+          } else if (command.kind === 'pause' || command.kind === 'resume') {
             if (memberId !== room.hostId)
               return reject('unauthorized', '只有房主可以暂停或恢复牌桌。')
             if (!room.board)
@@ -652,7 +686,7 @@ export class GameService {
               return reject('illegal_action', '本副已开始，不能重复开局。')
             room.board = dealBoard(room.members, this.deck())
           } else {
-            if (room.board)
+            if (room.board && !room.board.score)
               return reject(
                 'illegal_action',
                 '本副已开始，请等待下一副再选座。',
@@ -663,10 +697,16 @@ export class GameService {
               )
             )
               return reject('seat_taken', '这个座位已有人，请选择空位。')
+            if (room.board) {
+              if (member.seat) room.board.occupants[member.seat] = null
+              room.board.occupants[command.seat] = memberId
+              room.board.ready = {}
+            }
             member.seat = command.seat
           }
         }
       }
+      this.updateMembershipPresence(room)
       settleRoom(room)
       this.advanceReadyBoard(room)
       this.persistRoom(room, hash, command.operationId, fingerprint)
@@ -675,9 +715,14 @@ export class GameService {
           .prepare('UPDATE identities SET room = ?, member = ? WHERE hash = ?')
           .run(room.code, memberId, hash)
       this.db.exec('COMMIT')
+      if (removedId) {
+        this.observed.get(room.code)?.delete(removedId)
+        for (const [id, connection] of this.connections)
+          if (connection.code === room.code && connection.memberId === removedId) this.connections.delete(id)
+      }
       return {
         status: 'accepted',
-        state: visibleRoom(room, memberId),
+        state: command.kind === 'leave' ? departureReceipt(room.code, memberId, room.version) : visibleRoom(room, memberId),
         appliedVersion: room.version,
       }
     } catch {
